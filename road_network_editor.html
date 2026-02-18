@@ -43,6 +43,15 @@
       flex: 1; min-width: 0;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    .file-indicator {
+      font-size: 10px; color: #8aa;
+      max-width: 240px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      border: 1px solid #2a2a50; border-radius: 4px;
+      padding: 3px 7px;
+      background: #111127;
+      flex-shrink: 1;
+    }
 
     .header-btns { display: flex; gap: 3px; flex-shrink: 0; }
     .hbtn {
@@ -156,12 +165,14 @@
       <button class="tool-btn"        data-mode="delete"           title="D">&#10005; Delete</button>
     </div>
     <span id="statusMsg">Select mode — click to select, drag to move</span>
+    <span id="currentFile" class="file-indicator" title="Current file">File: (unsaved)</span>
     <div class="header-btns">
       <button class="hbtn generate" id="btnGenerate">&#9655; Generate</button>
       <button class="hbtn undo"   id="btnUndo"  title="Ctrl+Z">&#8630; Undo</button>
       <button class="hbtn clear"  id="btnClear">&#10005; Clear</button>
       <button class="hbtn import" id="btnImport">&#8657; Load</button>
-      <button class="hbtn export" id="btnExport">&#8659; Save</button>
+      <button class="hbtn export" id="btnSave">&#8659; Save</button>
+      <button class="hbtn export" id="btnSaveAs">Save As</button>
     </div>
   </header>
 
@@ -342,6 +353,23 @@ const appData = {
 
 const undoStack = [];
 const MAX_UNDO  = 50;
+const fileState = {
+  handle: null,
+  name: '(unsaved)',
+};
+
+function updateCurrentFileLabel() {
+  const el = document.getElementById('currentFile');
+  if(!el) return;
+  el.textContent = `File: ${fileState.name}`;
+  el.title = fileState.name;
+}
+
+function setCurrentFile(handle, name) {
+  fileState.handle = handle || null;
+  fileState.name = name || '(unsaved)';
+  updateCurrentFileLabel();
+}
 
 function pushUndo() {
   undoStack.push(JSON.stringify({ intersections: appData.intersections, roads: appData.roads }));
@@ -1384,7 +1412,7 @@ function toFloatJson(obj) {
   return s;
 }
 
-async function exportJSON() {
+async function saveAsJSON() {
   if(!appData.roads.length){ alert('No roads to export.'); return; }
 
   // World → Houdini: X right, Y=0, Z south — same axes, no inversion, world origin as reference
@@ -1413,12 +1441,13 @@ async function exportJSON() {
   if(window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({
-        suggestedName: 'road_network.json',
+        suggestedName: fileState.name==='(unsaved)' ? 'road_network.json' : fileState.name,
         types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
       });
       const writable = await handle.createWritable();
       await writable.write(content);
       await writable.close();
+      setCurrentFile(handle, handle.name || 'road_network.json');
     } catch(err) {
       if(err.name !== 'AbortError') alert('保存に失敗しました: ' + err.message);
     }
@@ -1428,24 +1457,87 @@ async function exportJSON() {
   const blob=new Blob([content],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url; a.download='road_network.json'; a.click();
+  const name = fileState.name==='(unsaved)' ? 'road_network.json' : fileState.name;
+  a.href=url; a.download=name; a.click();
+  setCurrentFile(null, name);
   URL.revokeObjectURL(url);
+}
+
+async function saveJSON() {
+  if(!appData.roads.length){ alert('No roads to export.'); return; }
+  if(!window.showSaveFilePicker || !fileState.handle) {
+    await saveAsJSON();
+    return;
+  }
+
+  // World → Houdini: X right, Y=0, Z south (same axes)
+  const w2h=p=>[parseFloat(p.x.toFixed(3)), 0, parseFloat(p.z.toFixed(3))];
+  const data=appData.roads.map(road=>{
+    const pts=roadPoints(road);
+    if(pts.length<2) return null;
+    return {
+      id: road.id, name: road.name,
+      roadType: road.roadType,
+      defaultTargetSpeed: road.targetSpeed,
+      defaultFriction: road.friction,
+      defaultWidthLaneLeft1: road.widthLeft,
+      defaultWidthLaneCenter: 0,
+      defaultWidthLaneRight1: road.widthRight,
+      active: 1,
+      point: pts.map(p=>({pos:w2h(p), useCurvatureRadius:0, curvatureRadius:0})),
+      verticalCurve:[], bankAngle:[], laneSection:[],
+    };
+  }).filter(Boolean);
+  const content = toFloatJson(data);
+
+  try {
+    const writable = await fileState.handle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    setCurrentFile(fileState.handle, fileState.handle.name || fileState.name);
+  } catch(err) {
+    if(err.name !== 'AbortError') alert('保存に失敗しました: ' + err.message);
+  }
 }
 
 // =============================================================================
 // Import JSON
 // =============================================================================
-function importJSON() { document.getElementById('fileImport').click(); }
+async function importJSON() {
+  if(window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      if(!handle) return;
+      const file = await handle.getFile();
+      const text = await file.text();
+      const ok = loadJSON(JSON.parse(text));
+      if(ok) setCurrentFile(handle, handle.name || file.name);
+      return;
+    } catch(err) {
+      if(err.name !== 'AbortError') alert('読み込みに失敗しました: ' + err.message);
+      return;
+    }
+  }
+  document.getElementById('fileImport').click();
+}
 
 document.getElementById('fileImport').addEventListener('change', function(e){
   const file=e.target.files[0]; if(!file) return;
   const fr=new FileReader();
-  fr.onload=evt=>{ try{loadJSON(JSON.parse(evt.target.result));}catch(err){alert('JSON parse error: '+err.message);} };
+  fr.onload=evt=>{
+    try{
+      const ok = loadJSON(JSON.parse(evt.target.result));
+      if(ok) setCurrentFile(null, file.name);
+    }catch(err){alert('JSON parse error: '+err.message);}
+  };
   fr.readAsText(file); this.value='';
 });
 
 function loadJSON(data) {
-  if(!Array.isArray(data)||!data.length){ alert('Invalid JSON: expected non-empty array'); return; }
+  if(!Array.isArray(data)||!data.length){ alert('Invalid JSON: expected non-empty array'); return false; }
   pushUndo();
 
   // Houdini → World: pos[0]=X, pos[2]=Z, direct mapping (same axes as export)
@@ -1486,6 +1578,7 @@ function loadJSON(data) {
   edState.selIntersectionId=null; edState.selRoadId=null;
   edState.selWaypointId=null; edState.pendingFromId=null;
   ren.fitView(); refresh();
+  return true;
 }
 
 // =============================================================================
@@ -1692,7 +1785,8 @@ function generateCourse() {
 // Buttons
 // =============================================================================
 document.getElementById('btnUndo')  .addEventListener('click', undo);
-document.getElementById('btnExport').addEventListener('click', exportJSON);
+document.getElementById('btnSave')  .addEventListener('click', saveJSON);
+document.getElementById('btnSaveAs').addEventListener('click', saveAsJSON);
 document.getElementById('btnImport').addEventListener('click', importJSON);
 document.getElementById('btnClear') .addEventListener('click', ()=>{
   if(!appData.intersections.length && !appData.roads.length) return;
@@ -1718,6 +1812,7 @@ document.getElementById('genModal').addEventListener('click', function(e){
 // Init
 // =============================================================================
 window.addEventListener('resize', resize);
+updateCurrentFileLabel();
 resize(); doRender(); updatePropsPanel(); updateRoadList();
 </script>
 </body>
