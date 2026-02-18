@@ -1,0 +1,511 @@
+[
+    {
+        "id": "a1b2c3d1",
+        "name": "NorthwestSweep",
+        "roadType": 0,
+        "defaultTargetSpeed": 80.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [80.0, 0.0, -900.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [160.0, 0.0, -940.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [260.0, 0.0, -958.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [350.0, 0.0, -960.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3d2",
+        "name": "PitStraight",
+        "roadType": 0,
+        "defaultTargetSpeed": 120.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [350.0, 0.0, -960.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [500.0, 0.0, -960.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [650.0, 0.0, -960.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3d3",
+        "name": "Turn1Entry",
+        "roadType": 0,
+        "defaultTargetSpeed": 80.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [650.0, 0.0, -960.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [750.0, 0.0, -955.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [830.0, 0.0, -930.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [880.0, 0.0, -890.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [900.0, 0.0, -850.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3d4",
+        "name": "EastHighSpeed",
+        "roadType": 0,
+        "defaultTargetSpeed": 100.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [900.0, 0.0, -850.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [935.0, 0.0, -780.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [955.0, 0.0, -700.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [960.0, 0.0, -600.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3d5",
+        "name": "Carousel",
+        "roadType": 0,
+        "defaultTargetSpeed": 60.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [960.0, 0.0, -600.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [978.0, 0.0, -560.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [988.0, 0.0, -520.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [985.0, 0.0, -480.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [970.0, 0.0, -440.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [948.0, 0.0, -405.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [920.0, 0.0, -380.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3d6",
+        "name": "SoutheastDescent",
+        "roadType": 0,
+        "defaultTargetSpeed": 80.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [920.0, 0.0, -380.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [890.0, 0.0, -320.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [860.0, 0.0, -250.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [840.0, 0.0, -195.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [800.0, 0.0, -150.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3d7",
+        "name": "SouthSweeper",
+        "roadType": 0,
+        "defaultTargetSpeed": 70.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [800.0, 0.0, -150.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [730.0, 0.0, -110.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [650.0, 0.0, -70.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [550.0, 0.0, -50.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3d8",
+        "name": "SouthernArc",
+        "roadType": 0,
+        "defaultTargetSpeed": 60.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [550.0, 0.0, -50.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [460.0, 0.0, -38.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [375.0, 0.0, -48.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [300.0, 0.0, -80.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3d9",
+        "name": "SouthwestClimb",
+        "roadType": 0,
+        "defaultTargetSpeed": 70.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [300.0, 0.0, -80.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [220.0, 0.0, -115.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [145.0, 0.0, -165.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [100.0, 0.0, -210.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [80.0, 0.0, -250.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3e0",
+        "name": "WestTechnical",
+        "roadType": 0,
+        "defaultTargetSpeed": 50.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [80.0, 0.0, -250.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [65.0, 0.0, -320.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [55.0, 0.0, -410.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [50.0, 0.0, -500.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3e1",
+        "name": "WestStraight",
+        "roadType": 0,
+        "defaultTargetSpeed": 80.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [50.0, 0.0, -500.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [48.0, 0.0, -580.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [52.0, 0.0, -650.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [60.0, 0.0, -720.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "a1b2c3e2",
+        "name": "NorthwestReturn",
+        "roadType": 0,
+        "defaultTargetSpeed": 70.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [60.0, 0.0, -720.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [55.0, 0.0, -780.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [60.0, 0.0, -840.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [80.0, 0.0, -900.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "b2c3d4e1",
+        "name": "PitLaneEntry",
+        "roadType": 0,
+        "defaultTargetSpeed": 60.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [350.0, 0.0, -960.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [340.0, 0.0, -890.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [345.0, 0.0, -820.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [350.0, 0.0, -750.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "b2c3d4e2",
+        "name": "InnerNorthLink",
+        "roadType": 0,
+        "defaultTargetSpeed": 70.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [350.0, 0.0, -750.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [440.0, 0.0, -738.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [525.0, 0.0, -718.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [600.0, 0.0, -700.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "b2c3d4e3",
+        "name": "InnerNEDiagonal",
+        "roadType": 0,
+        "defaultTargetSpeed": 60.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [600.0, 0.0, -700.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [635.0, 0.0, -645.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [670.0, 0.0, -575.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [700.0, 0.0, -500.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "b2c3d4e4",
+        "name": "CarouselBypass",
+        "roadType": 0,
+        "defaultTargetSpeed": 80.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [700.0, 0.0, -500.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [775.0, 0.0, -475.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [855.0, 0.0, -425.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [920.0, 0.0, -380.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "c3d4e5f1",
+        "name": "SCurveNorth",
+        "roadType": 0,
+        "defaultTargetSpeed": 50.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [350.0, 0.0, -750.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [310.0, 0.0, -700.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [395.0, 0.0, -630.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [295.0, 0.0, -555.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [385.0, 0.0, -488.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [350.0, 0.0, -420.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "c3d4e5f2",
+        "name": "SCurveSouth",
+        "roadType": 0,
+        "defaultTargetSpeed": 50.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [350.0, 0.0, -420.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [375.0, 0.0, -385.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [320.0, 0.0, -345.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [280.0, 0.0, -280.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "c3d4e5f3",
+        "name": "SWConnector",
+        "roadType": 0,
+        "defaultTargetSpeed": 60.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [280.0, 0.0, -280.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [265.0, 0.0, -210.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [275.0, 0.0, -140.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [300.0, 0.0, -80.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "d4e5f6a1",
+        "name": "CenterEastLink",
+        "roadType": 0,
+        "defaultTargetSpeed": 60.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [700.0, 0.0, -500.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [635.0, 0.0, -488.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [565.0, 0.0, -468.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [500.0, 0.0, -450.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "d4e5f6a2",
+        "name": "CenterWestLink",
+        "roadType": 0,
+        "defaultTargetSpeed": 50.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [500.0, 0.0, -450.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [435.0, 0.0, -443.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [390.0, 0.0, -432.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [350.0, 0.0, -420.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "d4e5f6a3",
+        "name": "CenterSouthDrop",
+        "roadType": 0,
+        "defaultTargetSpeed": 60.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [500.0, 0.0, -450.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [508.0, 0.0, -385.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [515.0, 0.0, -315.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [520.0, 0.0, -250.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "e5f6a7b1",
+        "name": "InnerSouthCross",
+        "roadType": 0,
+        "defaultTargetSpeed": 60.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [520.0, 0.0, -250.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [585.0, 0.0, -258.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [645.0, 0.0, -275.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [700.0, 0.0, -300.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "e5f6a7b2",
+        "name": "SEConnector",
+        "roadType": 0,
+        "defaultTargetSpeed": 70.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [700.0, 0.0, -300.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [735.0, 0.0, -250.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [770.0, 0.0, -200.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [800.0, 0.0, -150.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    },
+    {
+        "id": "f6a7b8c1",
+        "name": "TechnicalTwist",
+        "roadType": 0,
+        "defaultTargetSpeed": 40.0,
+        "defaultFriction": 0.15,
+        "defaultWidthLaneLeft1": 3.0,
+        "defaultWidthLaneCenter": 0.0,
+        "defaultWidthLaneRight1": 3.0,
+        "active": 1,
+        "point": [
+            { "pos": [280.0, 0.0, -280.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [335.0, 0.0, -252.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [385.0, 0.0, -278.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [435.0, 0.0, -248.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [480.0, 0.0, -268.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 },
+            { "pos": [520.0, 0.0, -250.0], "useCurvatureRadius": 0, "curvatureRadius": 0.0 }
+        ],
+        "verticalCurve": [],
+        "bankAngle": [],
+        "laneSection": []
+    }
+]

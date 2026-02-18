@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Road Network Editor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #12121f;
+      color: #dde;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+    header {
+      background: #1a1a30;
+      padding: 6px 14px;
+      border-bottom: 1px solid #2a2a50;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 14px; color: #e84060; letter-spacing: 1px; white-space: nowrap; }
+
+    .toolbar { display: flex; gap: 3px; }
+    .tool-btn {
+      padding: 4px 10px;
+      background: #0d0d20; color: #99a;
+      border: 1px solid #2a2a50; border-radius: 4px;
+      cursor: pointer; font-size: 11px; font-family: inherit;
+      transition: all 0.1s;
+    }
+    .tool-btn:hover { background: #1a1a38; color: #dde; }
+    .tool-btn.active { background: #e84060; color: #fff; border-color: #e84060; }
+
+    #statusMsg {
+      font-size: 11px; color: #778;
+      flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .header-btns { display: flex; gap: 3px; flex-shrink: 0; }
+    .hbtn {
+      padding: 4px 9px; border: none; border-radius: 4px;
+      cursor: pointer; font-size: 11px; font-family: inherit; font-weight: bold;
+      transition: filter 0.15s;
+    }
+    .hbtn:hover { filter: brightness(1.2); }
+    .hbtn.undo   { background: #2a2a50; color: #dde; }
+    .hbtn.clear  { background: #4a2020; color: #faa; }
+    .hbtn.export { background: #2a5a3a; color: #cec; }
+    .hbtn.import { background: #1a3a5a; color: #cde; }
+
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    .panel {
+      width: 210px; background: #1a1a30;
+      overflow-y: auto; padding: 10px; flex-shrink: 0;
+    }
+    .panel.left  { border-right: 1px solid #2a2a50; }
+    .panel.right { border-left:  1px solid #2a2a50; }
+
+    .sec-title {
+      font-size: 10px; font-weight: bold; color: #e84060;
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 10px 0 4px;
+      border-bottom: 1px solid #2a2a50; margin-bottom: 6px;
+    }
+    .sec-title:first-child { padding-top: 2px; }
+
+    .no-sel { font-size: 11px; color: #445; padding: 20px 4px; text-align: center; line-height: 1.7; }
+
+    .row { margin-bottom: 7px; }
+    .row label { display: block; font-size: 11px; color: #99a; margin-bottom: 2px; }
+    .row input[type="range"] { width: 100%; accent-color: #e84060; }
+    .row select,
+    .row input[type="number"],
+    .row input[type="text"] {
+      width: 100%; background: #0d0d20; color: #dde;
+      border: 1px solid #2a2a50; padding: 4px 6px;
+      border-radius: 3px; font-size: 12px;
+    }
+    .row select:focus, .row input:focus { outline: none; border-color: #e84060; }
+    .range-val { font-size: 10px; color: #e84060; float: right; }
+
+    /* Preset buttons */
+    .preset-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 4px; margin-bottom: 8px;
+    }
+    .preset-btn {
+      padding: 5px 4px; background: #0d0d20; color: #99a;
+      border: 1px solid #2a2a50; border-radius: 4px;
+      cursor: pointer; font-size: 11px; font-family: inherit;
+      text-align: center; transition: all 0.1s;
+    }
+    .preset-btn:hover { background: #1a1a38; color: #dde; border-color: #4455aa; }
+
+    .btn {
+      width: 100%; padding: 6px; margin-bottom: 4px;
+      border: none; border-radius: 4px;
+      cursor: pointer; font-size: 12px; font-weight: bold; font-family: inherit;
+      transition: filter 0.15s;
+    }
+    .btn:hover { filter: brightness(1.2); }
+    .btn.danger { background: #4a2020; color: #faa; }
+
+    .canvas-wrap { flex: 1; position: relative; overflow: hidden; background: #0a0a18; }
+    #cv { display: block; }
+    .canvas-hint {
+      position: absolute; bottom: 8px; left: 10px;
+      font-size: 10px; color: #2a2a44; pointer-events: none; line-height: 1.6;
+    }
+
+    /* Road list */
+    .road-item {
+      padding: 5px 7px; margin-bottom: 3px; background: #0d0d20;
+      border-radius: 3px; font-size: 11px; cursor: pointer;
+      border-left: 3px solid transparent; transition: background 0.1s;
+    }
+    .road-item:hover { background: #1a1a38; }
+    .road-item.sel { border-left-color: #e84060; }
+    .road-name { font-weight: bold; color: #dde; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .road-meta { color: #667; font-size: 10px; }
+    #roadCount { color: #889; }
+    .hbtn.generate { background:#2a3a5a; color:#aaddff; }
+    .gen-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.72);
+      display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .gen-dialog { background:#1a1a30; border:1px solid #3a3a60; border-radius:8px;
+      padding:20px 24px; width:320px; box-shadow:0 8px 32px rgba(0,0,0,0.6); }
+    .gen-title { font-size:13px; font-weight:bold; color:#e84060; margin-bottom:14px;
+      border-bottom:1px solid #2a2a50; padding-bottom:8px; }
+    .gen-row { margin-bottom:11px; }
+    .gen-label { display:block; font-size:11px; color:#99a; margin-bottom:4px; }
+    .gen-select { width:100%; background:#0d0d20; color:#dde; border:1px solid #2a2a50;
+      padding:5px 7px; border-radius:3px; font-size:12px; font-family:inherit; }
+    .gen-range { width:100%; accent-color:#e84060; }
+    .gen-val { color:#e84060; }
+    .gen-preview { background:#0d0d20; border:1px solid #2a2a50; border-radius:4px;
+      padding:8px; font-size:11px; color:#778; margin-bottom:12px; min-height:40px; line-height:1.6; }
+    .gen-actions { display:flex; gap:8px; justify-content:flex-end; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>&#9874; ROAD NETWORK EDITOR</h1>
+    <div class="toolbar" id="toolbar">
+      <button class="tool-btn active" data-mode="select"           title="V">&#9654; Select</button>
+      <button class="tool-btn"        data-mode="addIntersection"  title="A">&#x25CF; Add Intersection</button>
+      <button class="tool-btn"        data-mode="connect"          title="C">&#10145; Connect</button>
+      <button class="tool-btn"        data-mode="delete"           title="D">&#10005; Delete</button>
+    </div>
+    <span id="statusMsg">Select mode — click to select, drag to move</span>
+    <div class="header-btns">
+      <button class="hbtn generate" id="btnGenerate">&#9655; Generate</button>
+      <button class="hbtn undo"   id="btnUndo"  title="Ctrl+Z">&#8630; Undo</button>
+      <button class="hbtn clear"  id="btnClear">&#10005; Clear</button>
+      <button class="hbtn import" id="btnImport">&#8657; Load</button>
+      <button class="hbtn export" id="btnExport">&#8659; Save</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="panel left">
+      <div id="propContent">
+        <div class="no-sel">Nothing selected<br>
+          <span style="font-size:10px;color:#334">
+            Add Intersection でノードを配置し、<br>Connect でつないで道を作ります。
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="cv"></canvas>
+      <div class="canvas-hint">
+        [V] Select &nbsp;|&nbsp; [A] Add Intersection &nbsp;|&nbsp; [C] Connect &nbsp;|&nbsp; [D] Delete &nbsp;|&nbsp; [Del] 選択中を削除 &nbsp;|&nbsp; [Esc] キャンセル<br>
+        道を選択後にカーブ上をクリック → ウェイポイント追加 &nbsp;|&nbsp; Wheel: zoom &nbsp;|&nbsp; 右ドラッグ: pan &nbsp;|&nbsp; Ctrl+Z: undo
+      </div>
+    </div>
+
+    <div class="panel right">
+      <div class="sec-title">Roads (<span id="roadCount">0</span>)</div>
+      <div id="roadList"></div>
+    </div>
+  </div>
+
+  <div id="genModal" class="gen-overlay" style="display:none">
+    <div class="gen-dialog">
+      <div class="gen-title">&#9655; コース自動生成</div>
+      <div class="gen-row">
+        <label class="gen-label">コースタイプ</label>
+        <select id="genType" class="gen-select">
+          <option value="circuit">レースサーキット</option>
+          <option value="mountain">山岳コース</option>
+          <option value="highway">高速ループ</option>
+        </select>
+      </div>
+      <div class="gen-row">
+        <label class="gen-label">交差点数 <span class="gen-val" id="genCountVal">10</span></label>
+        <input type="range" id="genCount" min="6" max="16" value="10" class="gen-range">
+      </div>
+      <div class="gen-row">
+        <label class="gen-label">サイズ</label>
+        <select id="genSize" class="gen-select">
+          <option value="400">小 (~400m)</option>
+          <option value="800" selected>中 (~800m)</option>
+          <option value="1500">大 (~1500m)</option>
+        </select>
+      </div>
+      <div id="genPreview" class="gen-preview"></div>
+      <div class="gen-actions">
+        <button class="hbtn" id="genCancel" style="background:#2a2a50;color:#dde">キャンセル</button>
+        <button class="hbtn" id="genConfirm" style="background:#2a5a4a;color:#cfc">&#9654; 生成する</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="fileImport" accept=".json" style="display:none">
+
+<script>
+// =============================================================================
+// Vector utilities (x-z plane, z = south / down on screen)
+// =============================================================================
+const v2   = (x,z) => ({x,z});
+const sub  = (a,b) => v2(a.x-b.x, a.z-b.z);
+const lenV = v    => Math.sqrt(v.x*v.x + v.z*v.z);
+const nor  = v    => { const l=lenV(v)||1; return v2(v.x/l, v.z/l); };
+const lerp = (a,b,t) => v2(a.x+(b.x-a.x)*t, a.z+(b.z-a.z)*t);
+const dist = (a,b) => lenV(sub(b,a));
+const perp = v    => v2(-v.z, v.x);   // 90° CCW (left)
+const perpR= v    => v2(v.z, -v.x);   // 90° CW  (right)
+
+function hex8() {
+  return Math.floor(Math.random()*0x100000000).toString(16).padStart(8,'0');
+}
+
+// =============================================================================
+// Preset waypoint generators
+// Returns array of {x,z} waypoints (excluding endpoints).
+// =============================================================================
+function presetWaypoints(fromPt, toPt, preset) {
+  const d   = dist(fromPt, toPt);
+  const dir = nor(sub(toPt, fromPt));
+  const lp  = perp(dir);
+  const rp  = perpR(dir);
+
+  switch(preset) {
+    case 'straight':
+      return [];
+
+    case 'curve': {
+      const mid = lerp(fromPt, toPt, 0.5);
+      return [v2(mid.x + lp.x*d*0.20, mid.z + lp.z*d*0.20)];
+    }
+
+    case 'scurve': {
+      const signs = [1,-1,1,-1];
+      return signs.map((s,i) => {
+        const p = lerp(fromPt, toPt, (i+1)/5);
+        return v2(p.x + lp.x*d*0.14*s, p.z + lp.z*d*0.14*s);
+      });
+    }
+
+    case 'chicane': {
+      const off = d*0.22;
+      const p1  = lerp(fromPt, toPt, 0.30);
+      const p2  = lerp(fromPt, toPt, 0.70);
+      return [
+        v2(p1.x + lp.x*off, p1.z + lp.z*off),
+        v2(p2.x + rp.x*off, p2.z + rp.z*off),
+      ];
+    }
+
+    case 'hairpin': {
+      const off = d*0.60;
+      const p1  = lerp(fromPt, toPt, 0.15);
+      const p2  = lerp(fromPt, toPt, 0.50);
+      const p3  = lerp(fromPt, toPt, 0.85);
+      return [
+        v2(p1.x + lp.x*off*0.4, p1.z + lp.z*off*0.4),
+        v2(p2.x + lp.x*off,     p2.z + lp.z*off),
+        v2(p3.x + lp.x*off*0.4, p3.z + lp.z*off*0.4),
+      ];
+    }
+
+    case 'sweeper': {
+      const mid = lerp(fromPt, toPt, 0.5);
+      return [v2(mid.x + lp.x*d*0.32, mid.z + lp.z*d*0.32)];
+    }
+
+    case 'carousel': {
+      // ~300° arc bulging to the right of direction
+      const R         = Math.max(d*0.85, 80);
+      const halfChord = d/2;
+      const h         = Math.sqrt(Math.max(1, R*R - halfChord*halfChord));
+      const mid       = lerp(fromPt, toPt, 0.5);
+      const cx        = mid.x + rp.x*h;
+      const cz        = mid.z + rp.z*h;
+      const aFrom     = Math.atan2(fromPt.z-cz, fromPt.x-cx);
+      const aTo       = Math.atan2(toPt.z-cz,   toPt.x-cx);
+      let shortDelta  = aTo - aFrom;
+      while(shortDelta < 0) shortDelta += Math.PI*2;
+      const longDelta = Math.PI*2 - shortDelta;
+      const numPts    = 9;
+      const step      = longDelta/(numPts+1);
+      const pts = [];
+      for(let i=1; i<=numPts; i++){
+        const a = aFrom - step*i;
+        pts.push(v2(cx + R*Math.cos(a), cz + R*Math.sin(a)));
+      }
+      return pts;
+    }
+
+    default:
+      return [];
+  }
+}
+
+const PRESETS = [
+  { key:'straight', label:'ストレート' },
+  { key:'curve',    label:'カーブ' },
+  { key:'scurve',   label:'S字クランク' },
+  { key:'chicane',  label:'シケイン' },
+  { key:'hairpin',  label:'ヘアピン' },
+  { key:'sweeper',  label:'スウィーパー' },
+  { key:'carousel', label:'カルーセル' },
+];
+
+// =============================================================================
+// Data model
+// =============================================================================
+const appData = {
+  intersections: [],  // [{ id, x, z }]
+  roads: [],          // [{ id, fromId, toId, name, targetSpeed, widthLeft, widthRight,
+                      //    friction, roadType, waypoints:[{id,x,z}] }]
+};
+
+const undoStack = [];
+const MAX_UNDO  = 50;
+
+function pushUndo() {
+  undoStack.push(JSON.stringify({ intersections: appData.intersections, roads: appData.roads }));
+  if(undoStack.length > MAX_UNDO) undoStack.shift();
+}
+
+function undo() {
+  if(!undoStack.length) return;
+  const snap = JSON.parse(undoStack.pop());
+  appData.intersections = snap.intersections;
+  appData.roads         = snap.roads;
+  if(edState.selIntersectionId && !appData.intersections.find(p=>p.id===edState.selIntersectionId)) edState.selIntersectionId=null;
+  if(edState.selRoadId          && !appData.roads.find(r=>r.id===edState.selRoadId))                 edState.selRoadId=null;
+  edState.selWaypointId=null;
+  refresh();
+}
+
+function addIntersection(wx, wz) {
+  pushUndo();
+  const it = { id:hex8(), x:wx, z:wz };
+  appData.intersections.push(it);
+  return it;
+}
+
+function deleteIntersection(id) {
+  pushUndo();
+  appData.intersections = appData.intersections.filter(p=>p.id!==id);
+  appData.roads         = appData.roads.filter(r=>r.fromId!==id && r.toId!==id);
+}
+
+function addRoad(fromId, toId) {
+  if(appData.roads.some(r =>
+    (r.fromId===fromId && r.toId===toId) ||
+    (r.fromId===toId   && r.toId===fromId))) return null;
+  pushUndo();
+  const road = {
+    id:hex8(), fromId, toId,
+    name:`Road${appData.roads.length+1}`,
+    targetSpeed:60,
+    widthLeft:3.0, widthRight:3.0,
+    friction:0.15, roadType:0,
+    waypoints:[],
+  };
+  appData.roads.push(road);
+  return road;
+}
+
+function deleteRoad(id) {
+  pushUndo();
+  appData.roads = appData.roads.filter(r=>r.id!==id);
+}
+
+function deleteWaypoint(road, waypointId) {
+  pushUndo();
+  road.waypoints = road.waypoints.filter(w=>w.id!==waypointId);
+}
+
+// All points of a road: [fromIntersection, ...waypoints, toIntersection]
+function roadPoints(road) {
+  const from = appData.intersections.find(p=>p.id===road.fromId);
+  const to   = appData.intersections.find(p=>p.id===road.toId);
+  if(!from||!to) return [];
+  return [from, ...road.waypoints, to];
+}
+
+// =============================================================================
+// Renderer
+// =============================================================================
+class Renderer {
+  constructor(canvas) {
+    this.cv  = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.ox  = 0; this.oy = 0; this.zoom = 0.5;
+  }
+
+  w2s(p) { return { x: p.x*this.zoom+this.ox, y: p.z*this.zoom+this.oy }; }
+  s2w(p) { return { x:(p.x-this.ox)/this.zoom, z:(p.y-this.oy)/this.zoom }; }
+
+  fitView() {
+    const W=this.cv.width, H=this.cv.height;
+    const pts = appData.intersections;
+    if(!pts.length) { this.zoom=0.5; this.ox=W/2; this.oy=H/2; return; }
+    let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+    for(const p of pts){
+      minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+      minZ=Math.min(minZ,p.z); maxZ=Math.max(maxZ,p.z);
+    }
+    const mg  = 70;
+    const rng = Math.max(maxX-minX, maxZ-minZ, 200);
+    this.zoom = Math.min((W-mg*2)/rng, (H-mg*2)/rng);
+    this.ox   = W/2 - (minX+maxX)/2*this.zoom;
+    this.oy   = H/2 - (minZ+maxZ)/2*this.zoom;
+  }
+
+  render(state) {
+    const { ctx } = this;
+    const W=this.cv.width, H=this.cv.height;
+    ctx.clearRect(0,0,W,H);
+
+    // --- Grid ---
+    const minorWorldUnit = 100;
+    const gs = Math.max(10, Math.round(minorWorldUnit * this.zoom));
+    const majorGs = gs * 5; // major grid every 5 minor cells (500 world units)
+
+    // Minor grid
+    if(gs > 8) {
+      ctx.strokeStyle='#1a1a30'; ctx.lineWidth=1;
+      for(let x=((this.ox%gs)+gs)%gs; x<W; x+=gs){
+        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+      }
+      for(let y=((this.oy%gs)+gs)%gs; y<H; y+=gs){
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+      }
+    }
+
+    // Major grid lines (every 10 cells) + coordinate labels
+    if(majorGs > 8) {
+      ctx.strokeStyle='#262644'; ctx.lineWidth=1;
+      const mxStart=((this.ox%majorGs)+majorGs)%majorGs;
+      const myStart=((this.oy%majorGs)+majorGs)%majorGs;
+      for(let x=mxStart; x<W; x+=majorGs){
+        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+      }
+      for(let y=myStart; y<H; y+=majorGs){
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+      }
+      // Coordinate labels: X along top, Z along right edge
+      ctx.font='10px monospace';
+      for(let x=mxStart; x<W; x+=majorGs){
+        const wx=Math.round((x-this.ox)/this.zoom);
+        if(wx===0) continue; // skip origin (drawn separately)
+        ctx.fillStyle='#38386a';
+        ctx.textAlign='left';
+        ctx.fillText(wx+'m', x+3, 13);
+      }
+      for(let y=myStart; y<H; y+=majorGs){
+        const wz=Math.round((y-this.oy)/this.zoom);
+        if(wz===0) continue;
+        ctx.fillStyle='#38386a';
+        ctx.textAlign='right';
+        ctx.fillText(wz+'m', W-3, y-3);
+      }
+      ctx.textAlign='left';
+    }
+
+    // --- Origin marker ---
+    const os = this.w2s({x:0, z:0});
+    const oVisible = os.x>-100 && os.x<W+100 && os.y>-100 && os.y<H+100;
+    if(oVisible) {
+      // Axis lines through origin (brighter than major grid)
+      ctx.strokeStyle='#3a3a70'; ctx.lineWidth=1;
+      if(os.x>0 && os.x<W){
+        ctx.beginPath(); ctx.moveTo(os.x,0); ctx.lineTo(os.x,H); ctx.stroke();
+      }
+      if(os.y>0 && os.y<H){
+        ctx.beginPath(); ctx.moveTo(0,os.y); ctx.lineTo(W,os.y); ctx.stroke();
+      }
+      // Origin dot (only when actually on canvas)
+      if(os.x>-10 && os.x<W+10 && os.y>-10 && os.y<H+10){
+        ctx.strokeStyle='#5560aa'; ctx.lineWidth=1.5;
+        const cr=6;
+        ctx.beginPath();
+        ctx.moveTo(os.x-cr,os.y); ctx.lineTo(os.x+cr,os.y);
+        ctx.moveTo(os.x,os.y-cr); ctx.lineTo(os.x,os.y+cr);
+        ctx.stroke();
+        ctx.fillStyle='#5560aa';
+        ctx.beginPath(); ctx.arc(os.x,os.y,2.5,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#6670cc';
+        ctx.font='bold 10px monospace';
+        ctx.textAlign='left';
+        ctx.fillText('O',os.x+8,os.y-4);
+      }
+    }
+
+    // --- Axis direction indicator (top-left corner) ---
+    {
+      const ax=22, ay=22, arLen=18;
+      ctx.strokeStyle='#4466aa'; ctx.fillStyle='#4466aa'; ctx.lineWidth=1.5;
+      ctx.font='bold 10px monospace'; ctx.textAlign='left';
+      // X+ right arrow
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(ax+arLen,ay); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ax+arLen,ay); ctx.lineTo(ax+arLen-5,ay-3); ctx.lineTo(ax+arLen-5,ay+3);
+      ctx.closePath(); ctx.fill();
+      ctx.fillText('X+',ax+arLen+3,ay+4);
+      // Z+ down arrow
+      ctx.strokeStyle='#44aa66'; ctx.fillStyle='#44aa66';
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(ax,ay+arLen); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ax,ay+arLen); ctx.lineTo(ax-3,ay+arLen-5); ctx.lineTo(ax+3,ay+arLen-5);
+      ctx.closePath(); ctx.fill();
+      ctx.fillText('Z+',ax+4,ay+arLen+12);
+      ctx.textAlign='left';
+    }
+
+    const { selRoadId, selIntersectionId, selWaypointId, pendingFromId,
+            mouseWorld, mode, hoverRoadId, hoverIntersectionId, hoverWaypointId,
+            selIntersectionIds, rectSelecting, rectStart, rectCurrent, dragRoadId } = state;
+
+    // Roads — unselected first, selected on top
+    for(let pass=0; pass<2; pass++) {
+      for(const road of appData.roads) {
+        const isSel   = road.id === selRoadId;
+        const isHover = road.id === hoverRoadId;
+        const isDraggingBody = road.id === dragRoadId;
+        if(pass===0 && isSel)  continue;
+        if(pass===1 && !isSel) continue;
+
+        const pts = roadPoints(road);
+        if(pts.length < 2) continue;
+
+        ctx.strokeStyle = isSel ? (isDraggingBody ? '#ffee88' : '#ffffff') : isHover ? '#aaccee' : '#6688bb';
+        ctx.lineWidth   = isSel ? 3.5 : isHover ? 2.5 : 2;
+        ctx.setLineDash([]);
+        this._drawCurve(pts);
+        ctx.stroke();
+
+        // Direction arrow at midpoint
+        const mid = this._midPoint(pts);
+        if(mid) this._drawArrow(mid.p, mid.dir, isSel ? '#ffffff' : '#4466aa', isSel ? 9 : 7);
+
+        // Waypoints — only for selected road
+        if(isSel) {
+          // Guide skeleton: dashed polyline connecting all control points
+          if(pts.length >= 2) {
+            ctx.strokeStyle='#334455'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+            ctx.beginPath();
+            const s0=this.w2s(pts[0]); ctx.moveTo(s0.x,s0.y);
+            for(let i=1;i<pts.length;i++){const si=this.w2s(pts[i]);ctx.lineTo(si.x,si.y);}
+            ctx.stroke(); ctx.setLineDash([]);
+          }
+          for(const wp of road.waypoints) {
+            const s    = this.w2s(wp);
+            const isSW = wp.id === selWaypointId;
+            const isHW = wp.id === hoverWaypointId;
+            const r    = isSW ? 7 : isHW ? 6 : 5;
+            const fill = isSW ? '#e84060' : isHW ? '#ffaa44' : '#ffcc44';
+            ctx.beginPath();
+            ctx.moveTo(s.x,    s.y-r); ctx.lineTo(s.x+r, s.y);
+            ctx.lineTo(s.x,    s.y+r); ctx.lineTo(s.x-r, s.y);
+            ctx.closePath();
+            ctx.fillStyle=fill; ctx.fill();
+            ctx.strokeStyle='#0a0a18'; ctx.lineWidth=1; ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // Connect-mode preview
+    if(mode==='connect' && pendingFromId && mouseWorld) {
+      const fromPt = appData.intersections.find(p=>p.id===pendingFromId);
+      if(fromPt) {
+        const fs = this.w2s(fromPt), ts = this.w2s(mouseWorld);
+        ctx.strokeStyle='#e84060'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
+        ctx.beginPath(); ctx.moveTo(fs.x,fs.y); ctx.lineTo(ts.x,ts.y); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Intersections
+    for(const it of appData.intersections) {
+      const s       = this.w2s(it);
+      const isSel   = it.id === selIntersectionId;
+      const isMulti = selIntersectionIds.length > 0 && selIntersectionIds.includes(it.id);
+      const isPend  = it.id === pendingFromId;
+      const isHov   = it.id === hoverIntersectionId;
+      const r       = isSel||isPend||isMulti ? 9 : isHov ? 8 : 6;
+      const fill    = isSel   ? '#e84060'
+                    : isMulti ? '#d055b0'
+                    : isPend  ? '#ff8844'
+                    : isHov   ? '#aabbcc'
+                    : '#778899';
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2);
+      ctx.fillStyle=fill; ctx.fill();
+      ctx.strokeStyle='#0a0a18'; ctx.lineWidth=1.5; ctx.stroke();
+      if(isMulti) {
+        ctx.strokeStyle='#ff80dd'; ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.arc(s.x, s.y, 13, 0, Math.PI*2); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Rubber-band rectangle selection
+    if(rectSelecting && rectStart && rectCurrent) {
+      const x1=Math.min(rectStart.x,rectCurrent.x), y1=Math.min(rectStart.y,rectCurrent.y);
+      const rw=Math.abs(rectCurrent.x-rectStart.x), rh=Math.abs(rectCurrent.y-rectStart.y);
+      ctx.save();
+      ctx.fillStyle='rgba(100,160,255,0.07)'; ctx.fillRect(x1,y1,rw,rh);
+      ctx.strokeStyle='rgba(100,180,255,0.7)'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+      ctx.strokeRect(x1,y1,rw,rh); ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  // Evaluate piecewise-quadratic Bezier at t [0,1].
+  // Curve passes through midpoints between consecutive control points,
+  // and through pts[0] / pts[last] exactly.
+  // Segments: pts[0]→mid(pts[1],pts[2])→mid(pts[2],pts[3])→…→pts[last]
+  // Each segment is a quadratic Bezier with pts[k+1] as the control handle.
+  _curveAt(pts, t) {
+    const n = pts.length - 1;
+    if(n <= 0) return v2(pts[0].x, pts[0].z);
+    if(n === 1) return lerp(pts[0], pts[1], t);
+    const numSegs = n - 1;                                 // n-1 segments total
+    const segT    = t * numSegs;
+    const k       = Math.min(Math.floor(segT), numSegs-1);
+    const lt      = segT - k;
+    const start   = k === 0       ? pts[0]                        : lerp(pts[k],   pts[k+1], 0.5);
+    const ctrl    = pts[k+1];
+    const end     = k < numSegs-1 ? lerp(pts[k+1], pts[k+2], 0.5): pts[n];
+    return lerp(lerp(start, ctrl, lt), lerp(ctrl, end, lt), lt);
+  }
+
+  // Piecewise quadratic Bezier using Canvas 2D API (matches _curveAt exactly).
+  // Loop: each interior control point pts[k+1] guides a quadratic to the next midpoint.
+  // Final quadratic ends at pts[last].
+  _drawCurve(pts) {
+    const ctx = this.ctx;
+    const n   = pts.length - 1;
+    if(n <= 0) return;
+    const sp = pts.map(p => this.w2s(p));
+    ctx.beginPath();
+    ctx.moveTo(sp[0].x, sp[0].y);
+    if(n === 1) {
+      ctx.lineTo(sp[1].x, sp[1].y);
+    } else {
+      for(let k=0; k<n-2; k++) {
+        const mx = (sp[k+1].x + sp[k+2].x) * 0.5;
+        const my = (sp[k+1].y + sp[k+2].y) * 0.5;
+        ctx.quadraticCurveTo(sp[k+1].x, sp[k+1].y, mx, my);
+      }
+      ctx.quadraticCurveTo(sp[n-1].x, sp[n-1].y, sp[n].x, sp[n].y);
+    }
+  }
+
+  _midPoint(pts) {
+    if(pts.length < 2) return null;
+    const p  = this._curveAt(pts, 0.5);
+    const p1 = this._curveAt(pts, 0.49);
+    const p2 = this._curveAt(pts, 0.51);
+    return { p, dir: nor(sub(p2, p1)) };
+  }
+
+  _drawArrow(wp, dir, color, size) {
+    const ctx=this.ctx, s=this.w2s(wp);
+    const angle=Math.atan2(dir.z, dir.x);
+    ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(angle);
+    ctx.fillStyle=color; ctx.globalAlpha=0.6;
+    ctx.beginPath();
+    ctx.moveTo(size,0); ctx.lineTo(-size*0.5,size*0.5); ctx.lineTo(-size*0.5,-size*0.5);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha=1; ctx.restore();
+  }
+
+  // --- Hit tests ---
+  hitTestIntersection(sx, sy, threshold=14) {
+    let best=null, bd=threshold;
+    for(const it of appData.intersections) {
+      const s=this.w2s(it), d=Math.hypot(s.x-sx, s.y-sy);
+      if(d<bd){ bd=d; best=it.id; }
+    }
+    return best;
+  }
+
+  hitTestWaypoint(sx, sy, road, threshold=10) {
+    let best=null, bd=threshold;
+    for(const wp of road.waypoints) {
+      const s=this.w2s(wp), d=Math.hypot(s.x-sx, s.y-sy);
+      if(d<bd){ bd=d; best=wp.id; }
+    }
+    return best;
+  }
+
+  hitTestRoad(sx, sy, threshold=14) {
+    let best=null, bd=threshold;
+    for(const road of appData.roads) {
+      const pts=roadPoints(road);
+      if(pts.length<2) continue;
+      const steps=Math.max(30, pts.length*10);
+      for(let i=0; i<=steps; i++) {
+        const wp=this._curveAt(pts, i/steps);
+        const sp=this.w2s(wp);
+        const d=Math.hypot(sp.x-sx, sp.y-sy);
+        if(d<bd){ bd=d; best=road.id; }
+      }
+    }
+    return best;
+  }
+
+  // Find which segment of pts (in screen space) is nearest to (sx,sy)
+  // Returns the segment start index (0 = between pts[0] and pts[1])
+  nearestSegmentIndex(sx, sy, pts) {
+    let bestSeg=0, bd=Infinity;
+    for(let i=0; i<pts.length-1; i++) {
+      const a=this.w2s(pts[i]), b=this.w2s(pts[i+1]);
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const len2=dx*dx+dy*dy;
+      if(len2<1e-6) continue;
+      let t=((sx-a.x)*dx+(sy-a.y)*dy)/len2;
+      t=Math.max(0,Math.min(1,t));
+      const px=a.x+t*dx, py=a.y+t*dy;
+      const d=Math.hypot(px-sx, py-sy);
+      if(d<bd){ bd=d; bestSeg=i; }
+    }
+    return bestSeg;
+  }
+}
+
+// =============================================================================
+// Editor state
+// =============================================================================
+const edState = {
+  mode: 'select',
+  selIntersectionId:  null,
+  selRoadId:          null,
+  selWaypointId:      null,
+  pendingFromId:      null,
+  hoverIntersectionId:null,
+  hoverRoadId:        null,
+  hoverWaypointId:    null,
+  mouseWorld:         null,
+  dragIntersectionId: null,
+  dragWaypointId:     null,
+  dragWaypointRoadId: null,
+  panning:            false,
+  panStart:           null,
+  panBase:            null,
+  rectSelecting:      false,
+  rectStart:          null,
+  rectCurrent:        null,
+  selIntersectionIds: [],
+  draggingGroup:      false,
+  dragGroupStart:     null,
+  dragGroupOffsets:   [],
+  dragRoadId:         null,
+  dragRoadClickWorld: null,
+};
+
+// =============================================================================
+// App
+// =============================================================================
+const cv  = document.getElementById('cv');
+const ren = new Renderer(cv);
+
+function resize() {
+  const wrap=document.getElementById('canvasWrap');
+  cv.width=wrap.clientWidth; cv.height=wrap.clientHeight;
+  doRender();
+}
+function doRender() { ren.render(edState); }
+function refresh()  { doRender(); updateRoadList(); updatePropsPanel(); }
+
+// =============================================================================
+// Mouse events
+// =============================================================================
+function getPos(e) {
+  const r=cv.getBoundingClientRect();
+  return {x:e.clientX-r.left, y:e.clientY-r.top};
+}
+
+cv.addEventListener('mousedown', e => {
+  const p=getPos(e), w=ren.s2w(p);
+
+  if(e.button===1 || e.button===2) {
+    edState.panning=true; edState.panStart=p; edState.panBase={x:ren.ox,y:ren.oy};
+    cv.style.cursor='move'; e.preventDefault(); return;
+  }
+  if(e.button!==0) return;
+
+  switch(edState.mode) {
+    case 'select': {
+      // 1. Waypoint of selected road
+      if(edState.selRoadId) {
+        const road=appData.roads.find(r=>r.id===edState.selRoadId);
+        if(road) {
+          const hitWP=ren.hitTestWaypoint(p.x,p.y,road,12);
+          if(hitWP) {
+            edState.selWaypointId=hitWP;
+            edState.dragWaypointId=hitWP; edState.dragWaypointRoadId=road.id;
+            cv.style.cursor='grabbing'; break;
+          }
+        }
+      }
+      // 2. Intersection
+      const hitIt=ren.hitTestIntersection(p.x,p.y);
+      if(hitIt) {
+        if(edState.selIntersectionIds.length>1 && edState.selIntersectionIds.includes(hitIt)) {
+          // Group drag: move all selected intersections together
+          pushUndo();
+          edState.draggingGroup=true; edState.dragGroupStart={x:p.x,y:p.y};
+          edState.dragGroupOffsets=edState.selIntersectionIds.map(id=>{
+            const it2=appData.intersections.find(q=>q.id===id);
+            return {kind:'intersection',id,ox:it2.x-w.x,oz:it2.z-w.z};
+          });
+          cv.style.cursor='grabbing'; break;
+        }
+        edState.selIntersectionIds=[];
+        edState.selIntersectionId=hitIt; edState.selRoadId=null; edState.selWaypointId=null;
+        edState.dragIntersectionId=hitIt; cv.style.cursor='grabbing'; break;
+      }
+      // 3. Road
+      const hitRoad=ren.hitTestRoad(p.x,p.y);
+      if(hitRoad) {
+        if(hitRoad===edState.selRoadId) {
+          // Already selected: prepare for either road-body drag or waypoint insertion (decided in mouseup/mousemove)
+          edState.dragRoadId=hitRoad;
+          edState.dragGroupStart={x:p.x,y:p.y};
+          edState.dragRoadClickWorld={x:w.x,z:w.z};
+          cv.style.cursor='grab';
+        } else {
+          edState.selIntersectionIds=[];
+          edState.selRoadId=hitRoad; edState.selIntersectionId=null; edState.selWaypointId=null;
+        }
+        break;
+      }
+      // 4. Empty → deselect + start rectangle selection
+      edState.selIntersectionId=null; edState.selIntersectionIds=[]; edState.selRoadId=null; edState.selWaypointId=null;
+      edState.rectSelecting=true; edState.rectStart={x:p.x,y:p.y}; edState.rectCurrent={x:p.x,y:p.y};
+      cv.style.cursor='crosshair';
+      break;
+    }
+
+    case 'addIntersection': {
+      addIntersection(w.x, w.z);
+      break;
+    }
+
+    case 'connect': {
+      const hitIt=ren.hitTestIntersection(p.x,p.y);
+      if(hitIt) {
+        if(!edState.pendingFromId) {
+          edState.pendingFromId=hitIt;
+          document.getElementById('statusMsg').textContent='2番目の交差点をクリックしてください。';
+        } else if(hitIt!==edState.pendingFromId) {
+          const road=addRoad(edState.pendingFromId, hitIt);
+          if(road) { edState.selRoadId=road.id; edState.selIntersectionId=null; }
+          else document.getElementById('statusMsg').textContent='この2点間には既に道があります。';
+          edState.pendingFromId=null;
+        } else {
+          edState.pendingFromId=null;
+        }
+      } else {
+        edState.pendingFromId=null;
+        edState.panning=true; edState.panStart=p; edState.panBase={x:ren.ox,y:ren.oy};
+        cv.style.cursor='move';
+      }
+      break;
+    }
+
+    case 'delete': {
+      // Waypoint of selected road first
+      if(edState.selRoadId) {
+        const road=appData.roads.find(r=>r.id===edState.selRoadId);
+        if(road) {
+          const hitWP=ren.hitTestWaypoint(p.x,p.y,road,14);
+          if(hitWP) {
+            deleteWaypoint(road,hitWP);
+            if(edState.selWaypointId===hitWP) edState.selWaypointId=null;
+            break;
+          }
+        }
+      }
+      const hitIt=ren.hitTestIntersection(p.x,p.y,14);
+      if(hitIt) {
+        deleteIntersection(hitIt);
+        if(edState.selIntersectionId===hitIt) edState.selIntersectionId=null;
+        if(edState.selRoadId && !appData.roads.find(r=>r.id===edState.selRoadId)) edState.selRoadId=null;
+        break;
+      }
+      const hitRoad=ren.hitTestRoad(p.x,p.y,10);
+      if(hitRoad) {
+        deleteRoad(hitRoad);
+        if(edState.selRoadId===hitRoad){ edState.selRoadId=null; edState.selWaypointId=null; }
+        break;
+      }
+      edState.panning=true; edState.panStart=p; edState.panBase={x:ren.ox,y:ren.oy};
+      cv.style.cursor='move';
+      break;
+    }
+  }
+  refresh();
+});
+
+cv.addEventListener('mousemove', e => {
+  const p=getPos(e), w=ren.s2w(p);
+  edState.mouseWorld={x:w.x, z:w.z};
+
+  // Road body drag pending — activate once threshold is crossed
+  if(edState.dragRoadId && !edState.draggingGroup) {
+    if(Math.hypot(p.x-edState.dragGroupStart.x, p.y-edState.dragGroupStart.y)>4) {
+      pushUndo();
+      edState.draggingGroup=true;
+      const road=appData.roads.find(r=>r.id===edState.dragRoadId);
+      if(road) {
+        const w0=ren.s2w(edState.dragGroupStart);
+        edState.dragGroupOffsets=[];
+        for(const wp of road.waypoints)
+          edState.dragGroupOffsets.push({kind:'waypoint',roadId:road.id,wpId:wp.id,ox:wp.x-w0.x,oz:wp.z-w0.z});
+        for(const itId of [road.fromId,road.toId]) {
+          const it=appData.intersections.find(q=>q.id===itId);
+          if(it) edState.dragGroupOffsets.push({kind:'intersection',id:itId,ox:it.x-w0.x,oz:it.z-w0.z});
+        }
+        cv.style.cursor='grabbing';
+      }
+    }
+  }
+  // Group drag (road body or multi-intersection)
+  if(edState.draggingGroup && edState.dragGroupOffsets.length>0) {
+    for(const off of edState.dragGroupOffsets) {
+      const nx=w.x+off.ox, nz=w.z+off.oz;
+      if(off.kind==='waypoint') {
+        const rd=appData.roads.find(r=>r.id===off.roadId);
+        if(rd){const wp=rd.waypoints.find(q=>q.id===off.wpId);if(wp){wp.x=nx;wp.z=nz;}}
+      } else {
+        const it=appData.intersections.find(q=>q.id===off.id);
+        if(it){it.x=nx;it.z=nz;}
+      }
+    }
+    doRender(); updatePropsPanel(); return;
+  }
+  // Rectangle selecting
+  if(edState.rectSelecting) {
+    edState.rectCurrent={x:p.x,y:p.y};
+    doRender(); return;
+  }
+
+  if(edState.dragWaypointId && edState.dragWaypointRoadId) {
+    const road=appData.roads.find(r=>r.id===edState.dragWaypointRoadId);
+    if(road){ const wp=road.waypoints.find(q=>q.id===edState.dragWaypointId); if(wp){wp.x=w.x;wp.z=w.z;} }
+    doRender(); return;
+  }
+  if(edState.dragIntersectionId) {
+    const it=appData.intersections.find(q=>q.id===edState.dragIntersectionId);
+    if(it){it.x=w.x;it.z=w.z;}
+    doRender(); updatePropsPanel(); return;
+  }
+  if(edState.panning) {
+    ren.ox=edState.panBase.x+(p.x-edState.panStart.x);
+    ren.oy=edState.panBase.y+(p.y-edState.panStart.y);
+    doRender(); return;
+  }
+
+  // Hover
+  const prevIt=edState.hoverIntersectionId, prevRd=edState.hoverRoadId, prevWP=edState.hoverWaypointId;
+  edState.hoverWaypointId=null;
+  edState.hoverIntersectionId=ren.hitTestIntersection(p.x,p.y,14);
+  if(!edState.hoverIntersectionId) {
+    if(edState.selRoadId) {
+      const road=appData.roads.find(r=>r.id===edState.selRoadId);
+      if(road) edState.hoverWaypointId=ren.hitTestWaypoint(p.x,p.y,road,12);
+    }
+    edState.hoverRoadId=edState.hoverWaypointId ? null : ren.hitTestRoad(p.x,p.y,8);
+  } else {
+    edState.hoverRoadId=null;
+  }
+
+  if(edState.hoverIntersectionId!==prevIt || edState.hoverRoadId!==prevRd ||
+     edState.hoverWaypointId!==prevWP ||
+     (edState.mode==='connect' && edState.pendingFromId)) {
+    doRender();
+  }
+});
+
+cv.addEventListener('mouseup', e => {
+  // Finish group drag (road body or multi-intersection)
+  if(edState.draggingGroup) {
+    edState.draggingGroup=false; edState.dragGroupOffsets=[]; edState.dragGroupStart=null;
+    edState.dragRoadId=null; edState.dragRoadClickWorld=null;
+    cv.style.cursor=''; refresh(); return;
+  }
+  // Road was clicked but not dragged → insert waypoint (original behavior)
+  if(edState.dragRoadId) {
+    const road=appData.roads.find(r=>r.id===edState.dragRoadId);
+    if(road) {
+      const pts=roadPoints(road);
+      const segIdx=ren.nearestSegmentIndex(edState.dragGroupStart.x,edState.dragGroupStart.y,pts);
+      const afterInWP=segIdx-1;
+      pushUndo();
+      const wp={id:hex8(), x:edState.dragRoadClickWorld.x, z:edState.dragRoadClickWorld.z};
+      road.waypoints.splice(afterInWP+1, 0, wp);
+      edState.selWaypointId=wp.id;
+    }
+    edState.dragRoadId=null; edState.dragRoadClickWorld=null; edState.dragGroupStart=null;
+    cv.style.cursor=''; refresh(); return;
+  }
+  // Finish rectangle selection
+  if(edState.rectSelecting) {
+    edState.rectSelecting=false;
+    const rs=edState.rectStart, rc=edState.rectCurrent;
+    if(rs && rc && Math.hypot(rc.x-rs.x, rc.y-rs.y)>=4) {
+      const sx1=Math.min(rs.x,rc.x), sy1=Math.min(rs.y,rc.y);
+      const sx2=Math.max(rs.x,rc.x), sy2=Math.max(rs.y,rc.y);
+      const ww1=ren.s2w({x:sx1,y:sy1}), ww2=ren.s2w({x:sx2,y:sy2});
+      const xMin=Math.min(ww1.x,ww2.x), xMax=Math.max(ww1.x,ww2.x);
+      const zMin=Math.min(ww1.z,ww2.z), zMax=Math.max(ww1.z,ww2.z);
+      edState.selIntersectionIds=appData.intersections
+        .filter(it=>it.x>=xMin&&it.x<=xMax&&it.z>=zMin&&it.z<=zMax)
+        .map(it=>it.id);
+      if(edState.selIntersectionIds.length===1) edState.selIntersectionId=edState.selIntersectionIds[0];
+    }
+    edState.rectStart=null; edState.rectCurrent=null;
+    cv.style.cursor=''; refresh(); return;
+  }
+  if(edState.dragWaypointId || edState.dragIntersectionId) {
+    edState.dragWaypointId=null; edState.dragWaypointRoadId=null; edState.dragIntersectionId=null;
+    cv.style.cursor=''; refresh(); return;
+  }
+  edState.panning=false; edState.panStart=null; cv.style.cursor='';
+});
+
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const p=getPos(e), w=ren.s2w(p);
+  const f=e.deltaY>0?0.85:1.15;
+  ren.zoom=Math.max(0.02,Math.min(30,ren.zoom*f));
+  ren.ox=p.x-w.x*ren.zoom; ren.oy=p.y-w.z*ren.zoom;
+  doRender();
+},{passive:false});
+
+cv.addEventListener('contextmenu', e=>e.preventDefault());
+
+// =============================================================================
+// Mode switching
+// =============================================================================
+const MODE_HINTS = {
+  select:          'Select — 交差点/道をクリック選択。空白をドラッグで矩形選択。道を選択後カーブ上をクリックでウェイポイント追加、ドラッグで道ごと移動',
+  addIntersection: 'Add Intersection — クリックで交差点を配置',
+  connect:         'Connect — 1つ目の交差点をクリック、次に2つ目をクリックして道を作成',
+  delete:          'Delete — 交差点・道・ウェイポイントをクリックして削除',
+};
+const MODE_CURSORS = { select:'default', addIntersection:'crosshair', connect:'crosshair', delete:'not-allowed' };
+
+function setMode(mode) {
+  edState.mode=mode; edState.pendingFromId=null;
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  document.getElementById('statusMsg').textContent=MODE_HINTS[mode]||'';
+  cv.style.cursor=MODE_CURSORS[mode]||'default';
+  doRender();
+}
+
+document.getElementById('toolbar').addEventListener('click', e=>{
+  const btn=e.target.closest('.tool-btn'); if(btn) setMode(btn.dataset.mode);
+});
+
+window.addEventListener('keydown', e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
+  switch(e.key.toLowerCase()){
+    case 'v': setMode('select'); break;
+    case 'a': setMode('addIntersection'); break;
+    case 'c': setMode('connect'); break;
+    case 'd': setMode('delete'); break;
+    case 'escape':
+      edState.pendingFromId=null;
+      edState.selIntersectionId=null; edState.selIntersectionIds=[]; edState.selRoadId=null; edState.selWaypointId=null;
+      edState.rectSelecting=false; edState.rectStart=null; edState.rectCurrent=null;
+      refresh(); break;
+    case 'delete': case 'backspace':
+      if(edState.selWaypointId && edState.selRoadId) {
+        const road=appData.roads.find(r=>r.id===edState.selRoadId);
+        if(road){ deleteWaypoint(road,edState.selWaypointId); edState.selWaypointId=null; refresh(); }
+      } else if(edState.selIntersectionIds.length>1) {
+        pushUndo();
+        const ids=[...edState.selIntersectionIds];
+        for(const id of ids) {
+          appData.intersections=appData.intersections.filter(it=>it.id!==id);
+          appData.roads=appData.roads.filter(r=>r.fromId!==id&&r.toId!==id);
+        }
+        edState.selIntersectionIds=[]; edState.selIntersectionId=null; edState.selRoadId=null; edState.selWaypointId=null;
+        refresh();
+      } else if(edState.selIntersectionId) {
+        deleteIntersection(edState.selIntersectionId); edState.selIntersectionId=null; refresh();
+      } else if(edState.selRoadId) {
+        deleteRoad(edState.selRoadId); edState.selRoadId=null; edState.selWaypointId=null; refresh();
+      }
+      break;
+    case 'z':
+      if(e.ctrlKey||e.metaKey){ e.preventDefault(); undo(); }
+      break;
+  }
+});
+
+// =============================================================================
+// Properties panel
+// =============================================================================
+function updatePropsPanel() {
+  const panel=document.getElementById('propContent');
+
+  if(edState.selIntersectionId) {
+    const it=appData.intersections.find(p=>p.id===edState.selIntersectionId);
+    if(!it){ panel.innerHTML='<div class="no-sel">Nothing selected</div>'; return; }
+    const connected=appData.roads.filter(r=>r.fromId===it.id||r.toId===it.id).length;
+    panel.innerHTML=`
+      <div class="sec-title">Intersection</div>
+      <div class="row"><label>ID</label><div style="font-size:10px;color:#556;word-break:break-all">${it.id}</div></div>
+      <div class="row"><label>X</label><div style="font-size:12px;color:#dde">${it.x.toFixed(1)}</div></div>
+      <div class="row"><label>Z</label><div style="font-size:12px;color:#dde">${it.z.toFixed(1)}</div></div>
+      <div class="row"><label>接続している道</label><div style="font-size:12px;color:#dde">${connected}</div></div>
+      <button class="btn danger" onclick="deleteSelectedIntersection()">&#10005; Delete Intersection</button>
+    `;
+    return;
+  }
+
+  if(edState.selRoadId) {
+    const road=appData.roads.find(r=>r.id===edState.selRoadId);
+    if(!road){ panel.innerHTML='<div class="no-sel">Nothing selected</div>'; return; }
+
+    const presetBtns=PRESETS.map(p=>
+      `<button class="preset-btn" onclick="applyPreset('${road.id}','${p.key}')">${p.label}</button>`
+    ).join('');
+
+    panel.innerHTML=`
+      <div class="sec-title">Road Properties</div>
+      <div class="row">
+        <label>Name</label>
+        <input type="text" id="pName" value="${road.name}">
+      </div>
+      <div class="row">
+        <label>Target Speed <span class="range-val" id="pSpdVal">${road.targetSpeed}</span> km/h</label>
+        <input type="range" id="pSpd" min="20" max="200" value="${road.targetSpeed}" step="5">
+      </div>
+      <div class="row">
+        <label>Width Left (m)</label>
+        <input type="number" id="pWidthL" value="${road.widthLeft}" min="0" max="20" step="0.5">
+      </div>
+      <div class="row">
+        <label>Width Right (m)</label>
+        <input type="number" id="pWidthR" value="${road.widthRight}" min="0" max="20" step="0.5">
+      </div>
+      <div class="row">
+        <label>Friction</label>
+        <input type="number" id="pFriction" value="${road.friction}" min="0" max="1" step="0.01">
+      </div>
+      <div class="row">
+        <label>Road Type</label>
+        <input type="number" id="pRoadType" value="${road.roadType}" min="0" max="99" step="1">
+      </div>
+      <div class="row">
+        <label>Waypoints: <strong style="color:#dde">${road.waypoints.length}</strong>
+          <span style="font-size:10px;color:#556"> (カーブ上クリックで追加)</span>
+        </label>
+      </div>
+      ${edState.selWaypointId ? `<button class="btn" style="background:#1a3a4a;color:#88ddff;margin-bottom:4px" onclick="splitRoadAtWaypoint('${road.id}','${edState.selWaypointId}')">&#9986; Split Road Here</button>` : ''}
+      <div class="sec-title">Shape Presets</div>
+      <div class="preset-grid">${presetBtns}</div>
+      <button class="btn danger" onclick="clearWaypoints('${road.id}')">&#10005; Clear Waypoints</button>
+      <button class="btn danger" style="margin-top:4px" onclick="deleteSelectedRoad()">&#10005; Delete Road</button>
+    `;
+    document.getElementById('pName')    .addEventListener('input',  e=>{ road.name=e.target.value; updateRoadList(); });
+    document.getElementById('pSpd')     .addEventListener('input',  e=>{ road.targetSpeed=+e.target.value; document.getElementById('pSpdVal').textContent=e.target.value; updateRoadList(); });
+    document.getElementById('pWidthL')  .addEventListener('change', e=>{ road.widthLeft =+e.target.value; });
+    document.getElementById('pWidthR')  .addEventListener('change', e=>{ road.widthRight=+e.target.value; });
+    document.getElementById('pFriction').addEventListener('change', e=>{ road.friction  =+e.target.value; });
+    document.getElementById('pRoadType').addEventListener('change', e=>{ road.roadType  =+e.target.value; });
+    return;
+  }
+
+  panel.innerHTML='<div class="no-sel">Nothing selected<br><span style="font-size:10px;color:#334">Add Intersection でノードを配置し、<br>Connect でつないで道を作ります。</span></div>';
+}
+
+function splitRoadAtWaypoint(roadId, waypointId) {
+  const road=appData.roads.find(r=>r.id===roadId);
+  if(!road) return;
+  const wpIdx=road.waypoints.findIndex(w=>w.id===waypointId);
+  if(wpIdx<0) return;
+  const wp=road.waypoints[wpIdx];
+
+  pushUndo();
+
+  // New intersection at waypoint position
+  const newIt={id:hex8(), x:wp.x, z:wp.z};
+  appData.intersections.push(newIt);
+
+  const props={targetSpeed:road.targetSpeed, widthLeft:road.widthLeft, widthRight:road.widthRight,
+               friction:road.friction, roadType:road.roadType};
+
+  // Road 1: fromId → newIt, waypoints before split
+  appData.roads.push({id:hex8(), fromId:road.fromId, toId:newIt.id, name:road.name+'-1',
+    ...props, waypoints:road.waypoints.slice(0,wpIdx).map(w=>({...w}))});
+
+  // Road 2: newIt → toId, waypoints after split
+  appData.roads.push({id:hex8(), fromId:newIt.id, toId:road.toId, name:road.name+'-2',
+    ...props, waypoints:road.waypoints.slice(wpIdx+1).map(w=>({...w}))});
+
+  // Remove original road
+  appData.roads=appData.roads.filter(r=>r.id!==roadId);
+
+  // Select new intersection
+  edState.selRoadId=null; edState.selWaypointId=null;
+  edState.selIntersectionId=newIt.id;
+  refresh();
+}
+
+function applyPreset(roadId, preset) {
+  const road=appData.roads.find(r=>r.id===roadId);
+  if(!road) return;
+  const from=appData.intersections.find(p=>p.id===road.fromId);
+  const to  =appData.intersections.find(p=>p.id===road.toId);
+  if(!from||!to) return;
+  pushUndo();
+  road.waypoints=presetWaypoints(from,to,preset).map(p=>({id:hex8(),x:p.x,z:p.z}));
+  edState.selWaypointId=null;
+  refresh();
+}
+
+function clearWaypoints(roadId) {
+  const road=appData.roads.find(r=>r.id===roadId);
+  if(!road) return;
+  pushUndo(); road.waypoints=[]; edState.selWaypointId=null; refresh();
+}
+
+function deleteSelectedIntersection() {
+  if(!edState.selIntersectionId) return;
+  deleteIntersection(edState.selIntersectionId); edState.selIntersectionId=null; refresh();
+}
+
+function deleteSelectedRoad() {
+  if(!edState.selRoadId) return;
+  deleteRoad(edState.selRoadId); edState.selRoadId=null; edState.selWaypointId=null; refresh();
+}
+
+// =============================================================================
+// Road list (right panel)
+// =============================================================================
+function updateRoadList() {
+  document.getElementById('roadCount').textContent=appData.roads.length;
+  document.getElementById('roadList').innerHTML=appData.roads.map(road=>{
+    const isSel=road.id===edState.selRoadId;
+    return `<div class="road-item${isSel?' sel':''}" onclick="selectRoad('${road.id}')">
+      <div class="road-name">${road.name}</div>
+      <div class="road-meta">${road.targetSpeed} km/h &middot; WP:${road.waypoints.length}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectRoad(id) {
+  edState.selRoadId=edState.selRoadId===id?null:id;
+  edState.selIntersectionId=null; edState.selWaypointId=null;
+  refresh();
+}
+
+// =============================================================================
+// Export JSON (claude.md format)
+// =============================================================================
+
+// Ensure a number serializes with a decimal point (e.g. 3 → "3.0")
+function fmtFloat(n) {
+  const s = String(n);
+  return s.includes('.') ? s : s + '.0';
+}
+
+// JSON.stringify with float formatting for specific fields and pos arrays
+function toFloatJson(obj) {
+  let s = JSON.stringify(obj, null, 2);
+  // Named float fields: add .0 to bare integers
+  for (const prop of ['defaultTargetSpeed','defaultFriction',
+      'defaultWidthLaneLeft1','defaultWidthLaneCenter','defaultWidthLaneRight1',
+      'curvatureRadius']) {
+    s = s.replace(new RegExp(`("${prop}": )(-?\\d+)(?!\\.)`, 'g'), '$1$2.0');
+  }
+  // pos arrays: ensure all three elements have a decimal point
+  s = s.replace(/"pos": \[\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)\s*\]/g,
+    (_, x, y, z) => `"pos": [${fmtFloat(x)}, ${fmtFloat(y)}, ${fmtFloat(z)}]`);
+  return s;
+}
+
+async function exportJSON() {
+  if(!appData.roads.length){ alert('No roads to export.'); return; }
+
+  // World → Houdini: X right, Y=0, Z south — same axes, no inversion, world origin as reference
+  const w2h=p=>[parseFloat(p.x.toFixed(3)), 0, parseFloat(p.z.toFixed(3))];
+
+  const data=appData.roads.map(road=>{
+    const pts=roadPoints(road);
+    if(pts.length<2) return null;
+    return {
+      id: road.id, name: road.name,
+      roadType: road.roadType,
+      defaultTargetSpeed: road.targetSpeed,
+      defaultFriction: road.friction,
+      defaultWidthLaneLeft1: road.widthLeft,
+      defaultWidthLaneCenter: 0,
+      defaultWidthLaneRight1: road.widthRight,
+      active: 1,
+      point: pts.map(p=>({pos:w2h(p), useCurvatureRadius:0, curvatureRadius:0})),
+      verticalCurve:[], bankAngle:[], laneSection:[],
+    };
+  }).filter(Boolean);
+
+  const content = toFloatJson(data);
+
+  // Use File System Access API (showSaveFilePicker) if available — enables overwrite
+  if(window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'road_network.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    } catch(err) {
+      if(err.name !== 'AbortError') alert('保存に失敗しました: ' + err.message);
+    }
+    return;
+  }
+  // Fallback for browsers without showSaveFilePicker
+  const blob=new Blob([content],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='road_network.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// =============================================================================
+// Import JSON
+// =============================================================================
+function importJSON() { document.getElementById('fileImport').click(); }
+
+document.getElementById('fileImport').addEventListener('change', function(e){
+  const file=e.target.files[0]; if(!file) return;
+  const fr=new FileReader();
+  fr.onload=evt=>{ try{loadJSON(JSON.parse(evt.target.result));}catch(err){alert('JSON parse error: '+err.message);} };
+  fr.readAsText(file); this.value='';
+});
+
+function loadJSON(data) {
+  if(!Array.isArray(data)||!data.length){ alert('Invalid JSON: expected non-empty array'); return; }
+  pushUndo();
+
+  // Houdini → World: pos[0]=X, pos[2]=Z, direct mapping (same axes as export)
+  const h2w=pos=>({x:pos[0], z:pos[2]});
+
+  const juncMap=new Map();
+  const newIntersections=[], newRoads=[];
+
+  const getOrCreate=pos=>{
+    const k=`${pos[0].toFixed(2)},${pos[2].toFixed(2)}`;
+    if(!juncMap.has(k)){
+      const id=hex8(); juncMap.set(k,id);
+      const wp=h2w(pos);
+      newIntersections.push({id,x:wp.x,z:wp.z});
+    }
+    return juncMap.get(k);
+  };
+
+  for(const road of data){
+    const pts=road.point||[];
+    if(pts.length<2) continue;
+    const fromId=getOrCreate(pts[0].pos);
+    const toId  =getOrCreate(pts[pts.length-1].pos);
+    const waypoints=pts.slice(1,pts.length-1).map(p=>{const wp=h2w(p.pos);return{id:hex8(),x:wp.x,z:wp.z};});
+    newRoads.push({
+      id:road.id||hex8(), fromId, toId,
+      name:road.name||'Road',
+      targetSpeed:road.defaultTargetSpeed||60,
+      widthLeft:road.defaultWidthLaneLeft1||3.0,
+      widthRight:road.defaultWidthLaneRight1||3.0,
+      friction:road.defaultFriction||0.15,
+      roadType:road.roadType||0,
+      waypoints,
+    });
+  }
+
+  appData.intersections=newIntersections; appData.roads=newRoads;
+  edState.selIntersectionId=null; edState.selRoadId=null;
+  edState.selWaypointId=null; edState.pendingFromId=null;
+  ren.fitView(); refresh();
+}
+
+// =============================================================================
+// Random Course Generator
+// =============================================================================
+const COURSE_CONFIGS = {
+  circuit: {
+    desc: 'サーキット閉回路。速度変化が大きく多彩なコーナー。',
+    closed: true,
+    widthL: 2.5, widthR: 2.5, friction: 0.14, roadType: 0,
+    segments: [
+      ['straight', 120,180,'ストレート'],
+      ['curve',     60,120,'コーナー'],
+      ['chicane',   40, 80,'シケイン'],
+      ['hairpin',   40, 60,'ヘアピン'],
+      ['sweeper',   80,140,'スウィーパー'],
+      ['scurve',    50, 80,'S字'],
+    ],
+    weights: [3,3,2,1,2,1],
+  },
+  mountain: {
+    desc: '急カーブとヘアピンが連続する山岳路。低速タイト。',
+    closed: null,
+    widthL: 1.5, widthR: 1.5, friction: 0.18, roadType: 1,
+    segments: [
+      ['straight',  40, 60,'ストレート'],
+      ['curve',     30, 60,'コーナー'],
+      ['hairpin',   20, 40,'ヘアピン'],
+      ['sweeper',   50, 80,'スウィーパー'],
+      ['scurve',    30, 50,'S字'],
+      ['chicane',   30, 50,'シケイン'],
+    ],
+    weights: [2,3,3,1,2,1],
+  },
+  highway: {
+    desc: '大半径の緩やかなカーブが続く高速閉回路。最高速向き。',
+    closed: true,
+    widthL: 2.0, widthR: 2.0, friction: 0.12, roadType: 2,
+    segments: [
+      ['straight', 130,160,'ストレート'],
+      ['sweeper',  100,140,'スウィーパー'],
+      ['curve',     80,120,'コーナー'],
+      ['chicane',   80,100,'シケイン'],
+    ],
+    weights: [5,3,2,1],
+  },
+};
+
+function openGenModal() {
+  updateGenPreview();
+  document.getElementById('genModal').style.display='flex';
+}
+function closeGenModal() {
+  document.getElementById('genModal').style.display='none';
+}
+function updateGenPreview() {
+  const cfg=COURSE_CONFIGS[document.getElementById('genType').value];
+  document.getElementById('genPreview').textContent=cfg.desc;
+}
+
+function _wRand(weights) {
+  let r=Math.random()*weights.reduce((a,b)=>a+b,0);
+  for(let i=0;i<weights.length;i++){ r-=weights[i]; if(r<=0)return i; }
+  return weights.length-1;
+}
+
+function generateCourse() {
+  const type   = document.getElementById('genType').value;
+  const N      = parseInt(document.getElementById('genCount').value,10);
+  const radius = parseInt(document.getElementById('genSize').value,10);
+  const cfg    = COURSE_CONFIGS[type];
+  if(appData.intersections.length||appData.roads.length) {
+    if(!confirm('既存のデータを削除してコースを生成しますか？')) return;
+  }
+  closeGenModal();
+  pushUndo();
+  appData.intersections=[]; appData.roads=[];
+  edState.selIntersectionId=null; edState.selRoadId=null;
+  edState.selWaypointId=null; edState.pendingFromId=null; edState.selIntersectionIds=[];
+
+  const isClosed = cfg.closed===null ? Math.random()<0.5 : cfg.closed;
+
+  // 凸配置（角度ソート済み）で交差点を配置 → 道路クロスなし
+  const arcSpan  = isClosed ? Math.PI*2 : Math.PI*1.5;
+  const arcStart = isClosed ? 0 : -Math.PI*0.75;
+  const gap = arcSpan/N;
+  const angles = Array.from({length:N},(_,i)=>{
+    return arcStart + gap*i + (Math.random()-0.5)*gap*0.8;
+  }).sort((a,b)=>a-b);
+
+  const its = angles.map(a=>{
+    const r=radius*(0.6+Math.random()*0.4);
+    return {id:hex8(), x:Math.cos(a)*r, z:Math.sin(a)*r};
+  });
+  appData.intersections=its;
+
+  const segCount = isClosed ? N : N-1;
+  const counters={};
+  for(let i=0;i<segCount;i++){
+    const from=its[i], to=its[(i+1)%N];
+    const si=_wRand(cfg.weights);
+    const [preset,minSpd,maxSpd,prefix]=cfg.segments[si];
+    counters[prefix]=(counters[prefix]||0)+1;
+    const speed=Math.round((minSpd+Math.random()*(maxSpd-minSpd))/5)*5;
+    const wps=presetWaypoints(from,to,preset).map(p=>({id:hex8(),x:p.x,z:p.z}));
+    appData.roads.push({
+      id:hex8(), fromId:from.id, toId:to.id,
+      name:prefix+counters[prefix],
+      targetSpeed:speed,
+      widthLeft:cfg.widthL, widthRight:cfg.widthR,
+      friction:cfg.friction, roadType:cfg.roadType,
+      waypoints:wps,
+    });
+  }
+
+  // --- 閉回路の場合、各交差点で接線方向が揃うよう制御点を調整 ---
+  if (isClosed) {
+    // Pass 1: 各交差点での「通過方向」（入出ベクトルの二等分線）を計算
+    const throughDirs = [];
+    for (let j = 0; j < N; j++) {
+      const roadIn  = appData.roads[(j - 1 + N) % N]; // この交差点に入る道
+      const roadOut = appData.roads[j];                 // この交差点から出る道
+      const P       = its[j];
+
+      // 入る道の最後の制御点（最後のウェイポイント、なければ始点交差点）
+      const wpsIn = roadIn.waypoints;
+      const Plast = wpsIn.length > 0
+        ? {x: wpsIn[wpsIn.length-1].x, z: wpsIn[wpsIn.length-1].z}
+        : its[(j - 1 + N) % N];
+
+      // 出る道の最初の制御点（最初のウェイポイント、なければ終点交差点）
+      const wpsOut = roadOut.waypoints;
+      const Pfirst = wpsOut.length > 0
+        ? {x: wpsOut[0].x, z: wpsOut[0].z}
+        : its[(j + 1) % N];
+
+      const dIn  = nor(sub(P, Plast));
+      const dOut = nor(sub(Pfirst, P));
+      const straightIn  = roadIn.waypoints.length === 0;
+      const straightOut = roadOut.waypoints.length === 0;
+
+      // 通過方向の決定:
+      //   ストレート隣接 → 固定方向に合わせる（カーブ側を調整）
+      //   両方カーブ     → 入出方向の二等分線
+      let dir;
+      if (straightIn) {
+        dir = dIn;        // 入る道がストレート → その方向に合わせる
+      } else if (straightOut) {
+        dir = dOut;       // 出る道がストレート → その方向に合わせる
+      } else {
+        const sx = dIn.x + dOut.x, sz = dIn.z + dOut.z;
+        const sLen = Math.sqrt(sx*sx + sz*sz);
+        dir = sLen > 1e-6 ? v2(sx/sLen, sz/sLen) : dIn;
+      }
+      throughDirs[j] = dir;
+    }
+
+    // Pass 2: 各道のウェイポイントを通過方向に合わせて調整
+    for (let i = 0; i < N; i++) {
+      const road = appData.roads[i];
+      if (road.waypoints.length === 0) continue;
+
+      const P0    = its[i];           // from 交差点
+      const Pn    = its[(i+1) % N];   // to 交差点
+      const dAvg0 = throughDirs[i];              // P0 での通過方向
+      const dAvg1 = throughDirs[(i+1) % N];      // Pn での通過方向
+
+      if (road.waypoints.length === 1) {
+        // ウェイポイント1個の場合：2方向線の交点を解析的に求める
+        // P0 + t*dAvg0 = Pn - s*dAvg1  を解く
+        const dx = Pn.x - P0.x, dz = Pn.z - P0.z;
+        const det = dAvg0.x * dAvg1.z - dAvg0.z * dAvg1.x;
+        if (Math.abs(det) > 1e-6) {
+          const t = (dx * dAvg1.z - dz * dAvg1.x) / det;
+          // t が道全長の 0.1〜0.9 倍の範囲に収まるようクランプ
+          const roadLen = dist(P0, Pn);
+          const tClamped = Math.max(roadLen * 0.1, Math.min(roadLen * 0.9, t));
+          road.waypoints[0].x = P0.x + dAvg0.x * tClamped;
+          road.waypoints[0].z = P0.z + dAvg0.z * tClamped;
+        }
+        // det ≈ 0（方向がほぼ平行）の場合はそのまま
+      } else {
+        // ウェイポイント2個以上：最初と最後のウェイポイントを各端の通過方向に揃える
+        const wp0 = road.waypoints[0];
+        const d0  = dist(P0, wp0);
+        wp0.x = P0.x + dAvg0.x * d0;
+        wp0.z = P0.z + dAvg0.z * d0;
+
+        const wpLast = road.waypoints[road.waypoints.length - 1];
+        const dN = dist(Pn, wpLast);
+        wpLast.x = Pn.x - dAvg1.x * dN;
+        wpLast.z = Pn.z - dAvg1.z * dN;
+      }
+    }
+  }
+
+  ren.fitView();
+  refresh();
+  document.getElementById('statusMsg').textContent=
+    `${cfg.desc.split('。')[0]} を生成 — ${N}交差点 ${appData.roads.length}道路`;
+}
+
+// =============================================================================
+// Buttons
+// =============================================================================
+document.getElementById('btnUndo')  .addEventListener('click', undo);
+document.getElementById('btnExport').addEventListener('click', exportJSON);
+document.getElementById('btnImport').addEventListener('click', importJSON);
+document.getElementById('btnClear') .addEventListener('click', ()=>{
+  if(!appData.intersections.length && !appData.roads.length) return;
+  if(!confirm('全ての交差点と道を削除しますか？')) return;
+  pushUndo();
+  appData.intersections=[]; appData.roads=[];
+  edState.selIntersectionId=null; edState.selRoadId=null;
+  edState.selWaypointId=null; edState.pendingFromId=null;
+  refresh();
+});
+document.getElementById('btnGenerate').addEventListener('click', openGenModal);
+document.getElementById('genCancel') .addEventListener('click', closeGenModal);
+document.getElementById('genConfirm').addEventListener('click', generateCourse);
+document.getElementById('genCount')  .addEventListener('input', function(){
+  document.getElementById('genCountVal').textContent=this.value;
+});
+document.getElementById('genType').addEventListener('change', updateGenPreview);
+document.getElementById('genModal').addEventListener('click', function(e){
+  if(e.target===this) closeGenModal();
+});
+
+// =============================================================================
+// Init
+// =============================================================================
+window.addEventListener('resize', resize);
+resize(); doRender(); updatePropsPanel(); updateRoadList();
+</script>
+</body>
+</html>
