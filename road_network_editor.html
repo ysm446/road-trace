@@ -1041,6 +1041,7 @@ cv.addEventListener('mouseup', e => {
         .filter(it=>it.x>=xMin&&it.x<=xMax&&it.z>=zMin&&it.z<=zMax)
         .map(it=>it.id);
       if(edState.selIntersectionIds.length===1) edState.selIntersectionId=edState.selIntersectionIds[0];
+      else edState.selIntersectionId=null;
     }
     edState.rectStart=null; edState.rectCurrent=null;
     cv.style.cursor=''; refresh(); return;
@@ -1128,6 +1129,27 @@ window.addEventListener('keydown', e=>{
 // =============================================================================
 function updatePropsPanel() {
   const panel=document.getElementById('propContent');
+
+  if(edState.selIntersectionIds.length===2) {
+    const [idA,idB]=edState.selIntersectionIds;
+    const a=appData.intersections.find(p=>p.id===idA);
+    const b=appData.intersections.find(p=>p.id===idB);
+    if(!a||!b){ panel.innerHTML='<div class="no-sel">Nothing selected</div>'; return; }
+    const midX=(a.x+b.x)/2, midZ=(a.z+b.z)/2;
+    panel.innerHTML=`
+      <div class="sec-title">2 Intersections Selected</div>
+      <div class="row"><label>A</label><div style="font-size:10px;color:#556;word-break:break-all">${a.id}</div></div>
+      <div class="row"><label>B</label><div style="font-size:10px;color:#556;word-break:break-all">${b.id}</div></div>
+      <div class="row"><label>Merge Position</label><div style="font-size:12px;color:#dde">X:${midX.toFixed(1)} / Z:${midZ.toFixed(1)}</div></div>
+      <button class="btn" style="background:#2a5a4a;color:#cfc" onclick="mergeSelectedIntersections()">&#x25CF; Merge Intersections</button>
+    `;
+    return;
+  }
+
+  if(edState.selIntersectionIds.length>2) {
+    panel.innerHTML='<div class="no-sel">3 points or more selected<br><span style="font-size:10px;color:#334">Merge uses exactly 2 intersections.</span></div>';
+    return;
+  }
 
   if(edState.selIntersectionId) {
     const it=appData.intersections.find(p=>p.id===edState.selIntersectionId);
@@ -1260,6 +1282,42 @@ function deleteSelectedIntersection() {
 function deleteSelectedRoad() {
   if(!edState.selRoadId) return;
   deleteRoad(edState.selRoadId); edState.selRoadId=null; edState.selWaypointId=null; refresh();
+}
+
+function mergeSelectedIntersections() {
+  if(edState.selIntersectionIds.length!==2) return;
+  const [idA,idB]=edState.selIntersectionIds;
+  const a=appData.intersections.find(p=>p.id===idA);
+  const b=appData.intersections.find(p=>p.id===idB);
+  if(!a||!b) return;
+  if(!confirm('選択した2つの交差点を1つにマージしますか？')) return;
+
+  pushUndo();
+
+  const merged={ id:hex8(), x:(a.x+b.x)/2, z:(a.z+b.z)/2 };
+  appData.intersections=appData.intersections.filter(p=>p.id!==idA && p.id!==idB);
+  appData.intersections.push(merged);
+
+  for(const road of appData.roads) {
+    if(road.fromId===idA || road.fromId===idB) road.fromId=merged.id;
+    if(road.toId===idA || road.toId===idB) road.toId=merged.id;
+  }
+
+  // Remove self-loops and duplicated roads after rewiring.
+  const seen=new Set();
+  appData.roads=appData.roads.filter(r=>{
+    if(r.fromId===r.toId) return false;
+    const key=[r.fromId,r.toId].sort().join('|');
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  edState.selIntersectionIds=[];
+  edState.selIntersectionId=merged.id;
+  edState.selRoadId=null;
+  edState.selWaypointId=null;
+  refresh();
 }
 
 // =============================================================================

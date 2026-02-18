@@ -1,5 +1,5 @@
 {
-  "mask_mode": "veg-suppressed（芝生除去）",
+  "mask_mode": "lab（従来）",
   "l_min": 30,
   "l_max": 170,
   "chroma_max": 15.0,
