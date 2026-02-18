@@ -366,10 +366,30 @@ function addIntersection(wx, wz) {
   return it;
 }
 
+function deleteIntersectionCore(id) {
+  const it = appData.intersections.find(p=>p.id===id);
+  if(!it) return;
+
+  // Keep roads by detaching each connected endpoint to its own new intersection.
+  for(const road of appData.roads) {
+    if(road.fromId===id) {
+      const repl={ id:hex8(), x:it.x, z:it.z };
+      appData.intersections.push(repl);
+      road.fromId=repl.id;
+    }
+    if(road.toId===id) {
+      const repl={ id:hex8(), x:it.x, z:it.z };
+      appData.intersections.push(repl);
+      road.toId=repl.id;
+    }
+  }
+
+  appData.intersections = appData.intersections.filter(p=>p.id!==id);
+}
+
 function deleteIntersection(id) {
   pushUndo();
-  appData.intersections = appData.intersections.filter(p=>p.id!==id);
-  appData.roads         = appData.roads.filter(r=>r.fromId!==id && r.toId!==id);
+  deleteIntersectionCore(id);
 }
 
 function addRoad(fromId, toId) {
@@ -1107,8 +1127,7 @@ window.addEventListener('keydown', e=>{
         pushUndo();
         const ids=[...edState.selIntersectionIds];
         for(const id of ids) {
-          appData.intersections=appData.intersections.filter(it=>it.id!==id);
-          appData.roads=appData.roads.filter(r=>r.fromId!==id&&r.toId!==id);
+          deleteIntersectionCore(id);
         }
         edState.selIntersectionIds=[]; edState.selIntersectionId=null; edState.selRoadId=null; edState.selWaypointId=null;
         refresh();
