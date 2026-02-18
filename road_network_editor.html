@@ -1350,15 +1350,9 @@ function mergeSelectedIntersections() {
     if(road.toId===idA || road.toId===idB) road.toId=merged.id;
   }
 
-  // Remove self-loops and duplicated roads after rewiring.
-  const seen=new Set();
-  appData.roads=appData.roads.filter(r=>{
-    if(r.fromId===r.toId) return false;
-    const key=[r.fromId,r.toId].sort().join('|');
-    if(seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  // Remove only self-loops created by rewiring (e.g. road directly between merged nodes).
+  // Keep parallel roads that now share the same two intersections.
+  appData.roads=appData.roads.filter(r=>r.fromId!==r.toId);
 
   edState.selIntersectionIds=[];
   edState.selIntersectionId=merged.id;
