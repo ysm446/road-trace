@@ -17,6 +17,7 @@ import colorsys
 import io
 import json
 import math
+import os
 import random
 import re
 import tempfile
@@ -49,9 +50,36 @@ DEFAULT_SMOOTH_WIN   = 9     # 座標スムージングウィンドウ
 DEFAULT_MERGE_GAP    = 20    # エンドポイント接続距離 [px]
 DEFAULT_MERGE_ANGLE  = 45.0  # 接続許容角度 [°]
 DEFAULT_MAX_IMG_SIZE = 1024
+DEFAULT_EXG_THRESH   = 25.0  # 植生判定ExGしきい値（大きいほど芝生除去が弱くなる）
+DEFAULT_GREEN_H_MIN  = 30    # 植生判定HSV Hue下限
+DEFAULT_GREEN_H_MAX  = 95    # 植生判定HSV Hue上限
+DEFAULT_GREEN_S_MIN  = 50    # 植生判定HSV Saturation下限
+DEFAULT_RESCUE_S_MAX = 70    # 植生判定から救済する道路候補の最大彩度
+DEFAULT_RESCUE_V_MIN = 95    # 植生判定から救済する道路候補の最小明度
+SETTINGS_FILE        = "setting.json"
 
 
 # ── ユーティリティ ─────────────────────────────────────────────────────────────
+
+def load_settings(path: str = SETTINGS_FILE) -> dict:
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_settings(update: dict, path: str = SETTINGS_FILE) -> None:
+    try:
+        data = load_settings(path)
+        data.update(update)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 def generate_road_id() -> str:
     return "".join(random.choices("0123456789abcdef", k=8))
@@ -111,6 +139,90 @@ def detect_road_mask(
     vis = cv2.addWeighted(vis, 0.6, green_layer, 0.4, 0)
     mask_pil = Image.fromarray(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
 
+    return filtered, mask_pil
+
+
+def _build_vegetation_mask(
+    image_bgr: np.ndarray,
+    exg_thresh: float = DEFAULT_EXG_THRESH,
+    green_h_min: int = DEFAULT_GREEN_H_MIN,
+    green_h_max: int = DEFAULT_GREEN_H_MAX,
+    green_s_min: int = DEFAULT_GREEN_S_MIN,
+) -> np.ndarray:
+    """ExG + HSV緑域で植生（芝生・草地）マスクを作る。"""
+    bgr_f = image_bgr.astype(np.float32)
+    b, g, r = cv2.split(bgr_f)
+    exg = (2.0 * g) - r - b
+    exg_mask = exg >= float(exg_thresh)
+
+    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
+    h, s, _ = cv2.split(hsv)
+    hsv_green = (
+        (h >= int(green_h_min)) & (h <= int(green_h_max)) &
+        (s >= int(green_s_min))
+    )
+
+    veg = (exg_mask | hsv_green).astype(np.uint8) * 255
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    veg = cv2.morphologyEx(veg, cv2.MORPH_OPEN, k)
+    veg = cv2.morphologyEx(veg, cv2.MORPH_CLOSE, k)
+    return veg
+
+
+def detect_road_mask_veg_suppressed(
+    image_bgr: np.ndarray,
+    l_min: int = DEFAULT_L_MIN,
+    l_max: int = DEFAULT_L_MAX,
+    chroma_max: float = DEFAULT_CHROMA_MAX,
+    close_size: int = DEFAULT_CLOSE_SIZE,
+    min_area: int = DEFAULT_MIN_AREA,
+    exg_thresh: float = DEFAULT_EXG_THRESH,
+    green_h_min: int = DEFAULT_GREEN_H_MIN,
+    green_h_max: int = DEFAULT_GREEN_H_MAX,
+    green_s_min: int = DEFAULT_GREEN_S_MIN,
+    rescue_s_max: int = DEFAULT_RESCUE_S_MAX,
+    rescue_v_min: int = DEFAULT_RESCUE_V_MIN,
+) -> tuple[np.ndarray, Image.Image]:
+    """植生を先に除去してからLABで道路候補を抽出する。"""
+    lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
+    L, a, b = cv2.split(lab)
+
+    af = a.astype(np.float32) - 128.0
+    bf = b.astype(np.float32) - 128.0
+    chroma = np.sqrt(af ** 2 + bf ** 2)
+
+    road_like = (L >= l_min) & (L <= l_max) & (chroma <= chroma_max)
+    vegetation = _build_vegetation_mask(
+        image_bgr, exg_thresh, green_h_min, green_h_max, green_s_min
+    ) > 0
+
+    # 植生誤判定の救済: 低彩度かつ高輝度な画素は道路候補として残す
+    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
+    _, s_hsv, v_hsv = cv2.split(hsv)
+    rescue = (
+        road_like &
+        (s_hsv <= int(rescue_s_max)) &
+        (v_hsv >= int(rescue_v_min))
+    )
+    effective_vegetation = vegetation & (~rescue)
+    raw_mask = (road_like & (~effective_vegetation)).astype(np.uint8) * 255
+
+    k_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close_size, close_size))
+    k_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    mask = cv2.morphologyEx(raw_mask, cv2.MORPH_CLOSE, k_close)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k_open)
+
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    filtered = np.zeros_like(mask)
+    for i in range(1, num_labels):
+        if stats[i, cv2.CC_STAT_AREA] >= min_area:
+            filtered[labels == i] = 255
+
+    vis = image_bgr.copy()
+    green_layer = np.zeros_like(vis)
+    green_layer[filtered > 0] = (0, 200, 0)
+    vis = cv2.addWeighted(vis, 0.6, green_layer, 0.4, 0)
+    mask_pil = Image.fromarray(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
     return filtered, mask_pil
 
 
@@ -491,8 +603,11 @@ def run_extraction(
     default_speed: float, default_width: float,
     road_type: int, max_image_size: int,
     # CV パラメータ
+    mask_mode: str,
     l_min: int, l_max: int, chroma_max: float,
     close_size: int, min_area: int,
+    exg_thresh: float, green_h_min: int, green_h_max: int, green_s_min: int,
+    rescue_s_max: int, rescue_v_min: int,
     min_pixels: int, simplify_eps: float,
     smooth_window: int, merge_gap: float, merge_angle: float,
 ):
@@ -508,9 +623,16 @@ def run_extraction(
     try:
         # Step 1: 道路マスク
         yield None, None, "Step 1/4: 道路マスクを生成中...", "", gr.update(visible=False)
-        road_mask, mask_pil = detect_road_mask(
-            image_bgr, l_min, l_max, chroma_max, close_size, min_area
-        )
+        if mask_mode == "veg-suppressed（芝生除去）":
+            road_mask, mask_pil = detect_road_mask_veg_suppressed(
+                image_bgr, l_min, l_max, chroma_max, close_size, min_area,
+                exg_thresh, green_h_min, green_h_max, green_s_min,
+                rescue_s_max, rescue_v_min,
+            )
+        else:
+            road_mask, mask_pil = detect_road_mask(
+                image_bgr, l_min, l_max, chroma_max, close_size, min_area
+            )
 
         # Step 2: スケルトン化 → 方向ガイドトレース
         yield mask_pil, None, "Step 2/4: スケルトン化・方向ガイドトレース中...", "", gr.update(visible=False)
@@ -608,9 +730,178 @@ def run_extraction(
         ), "", gr.update(visible=False)
 
 
+def run_mask_generation(
+    image: Optional[Image.Image],
+    mask_mode: str,
+    l_min: int, l_max: int, chroma_max: float,
+    close_size: int, min_area: int,
+    exg_thresh: float, green_h_min: int, green_h_max: int, green_s_min: int,
+    rescue_s_max: int, rescue_v_min: int,
+):
+    """Step 1: マスク生成のみ実行して state に保持する。"""
+    if image is None:
+        return None, "画像をアップロードしてください。", None, "", gr.update(visible=False), None
+
+    try:
+        save_settings({
+            "mask_mode": str(mask_mode),
+            "l_min": int(l_min),
+            "l_max": int(l_max),
+            "chroma_max": float(chroma_max),
+            "close_size": int(close_size),
+            "min_area": int(min_area),
+            "exg_thresh": float(exg_thresh),
+            "green_h_min": int(green_h_min),
+            "green_h_max": int(green_h_max),
+            "green_s_min": int(green_s_min),
+            "rescue_s_max": int(rescue_s_max),
+            "rescue_v_min": int(rescue_v_min),
+        })
+        image_bgr = pil_to_bgr(image)
+        if mask_mode == "veg-suppressed（芝生除去）":
+            road_mask, mask_pil = detect_road_mask_veg_suppressed(
+                image_bgr, l_min, l_max, chroma_max, close_size, min_area,
+                exg_thresh, green_h_min, green_h_max, green_s_min,
+                rescue_s_max, rescue_v_min,
+            )
+        else:
+            road_mask, mask_pil = detect_road_mask(
+                image_bgr, l_min, l_max, chroma_max, close_size, min_area
+            )
+
+        ratio = float(np.count_nonzero(road_mask)) / float(road_mask.size)
+        status = (
+            f"Step 1 完了: マスク生成済み（被覆率 {ratio*100:.1f}%）\n"
+            "次に「Step 2: パス生成」を実行してください。"
+        )
+        return mask_pil, status, None, "", gr.update(visible=False), road_mask
+    except Exception as e:
+        return None, f"マスク生成エラー: {type(e).__name__}: {e}", None, "", gr.update(visible=False), None
+
+
+def run_path_generation(
+    image: Optional[Image.Image],
+    road_mask_state,
+    ollama_url: str, model_name: str,
+    world_scale: float, center_at_origin: bool,
+    default_speed: float, default_width: float,
+    road_type: int, max_image_size: int,
+    min_pixels: int, simplify_eps: float,
+    smooth_window: int, merge_gap: float, merge_angle: float,
+):
+    """Step 2: 保存済みマスクからパス生成〜JSON出力まで実行する。"""
+    if image is None:
+        return None, "画像をアップロードしてください。", "", gr.update(visible=False)
+    if road_mask_state is None:
+        return None, "先に「Step 1: マスク生成」を実行してください。", "", gr.update(visible=False)
+
+    try:
+        save_settings({
+            "ollama_url": str(ollama_url),
+            "model_name": str(model_name),
+            "world_scale": float(world_scale),
+            "center_origin": bool(center_at_origin),
+            "default_speed": float(default_speed),
+            "default_width": float(default_width),
+            "road_type": int(road_type),
+            "max_img_size": int(max_image_size),
+            "min_pixels": int(min_pixels),
+            "simplify_eps": float(simplify_eps),
+            "smooth_window": int(smooth_window),
+            "merge_gap": float(merge_gap),
+            "merge_angle": float(merge_angle),
+        })
+        road_mask = np.array(road_mask_state, dtype=np.uint8)
+        if road_mask.ndim != 2:
+            return None, "保持マスクの形式が不正です。Step 1 を再実行してください。", "", gr.update(visible=False)
+
+        img_w, img_h = image.width, image.height
+        ollama_url = ollama_url.rstrip("/")
+        paths = skeleton_to_paths(
+            road_mask, min_pixels, simplify_eps,
+            int(smooth_window), merge_gap, merge_angle,
+        )
+        if not paths:
+            return None, "Step 2: パスが検出されませんでした。Step 1 パラメータを再調整してください。", "", gr.update(visible=False)
+
+        label_map = label_paths_with_ai(
+            image, paths, img_w, img_h, model_name, ollama_url, int(max_image_size)
+        )
+
+        road_objs: list[dict] = []
+        for i, path in enumerate(paths):
+            lbl = label_map.get(i, {})
+            name = lbl.get("name") or auto_name_path(path, img_w, img_h, i)
+            try:
+                speed = max(20.0, min(200.0, float(lbl.get("suggestedSpeed", default_speed))))
+            except (ValueError, TypeError):
+                speed = default_speed
+            rtype = lbl.get("roadType", int(road_type))
+
+            pts_world = []
+            for px, py in path:
+                wx, wz = pixel_to_world(px, py, img_w, img_h, world_scale, center_at_origin)
+                pts_world.append({
+                    "pos": [wx, 0.0, wz],
+                    "useCurvatureRadius": 0,
+                    "curvatureRadius": 0.0,
+                })
+
+            road_objs.append({
+                "id": generate_road_id(),
+                "name": name,
+                "roadType": int(rtype),
+                "defaultTargetSpeed": float(speed),
+                "defaultFriction": DEFAULT_FRICTION,
+                "defaultWidthLaneLeft1": float(default_width),
+                "defaultWidthLaneCenter": 0.0,
+                "defaultWidthLaneRight1": float(default_width),
+                "active": 1,
+                "point": pts_world,
+                "verticalCurve": [], "bankAngle": [], "laneSection": [],
+            })
+
+        json_str = format_road_json(road_objs)
+        roads_for_vis = [{"name": r["name"], "points": p} for r, p in zip(road_objs, paths)]
+        result_pil = visualize_roads(image, roads_for_vis)
+
+        tmp = tempfile.NamedTemporaryFile(
+            delete=False, suffix=".json", prefix="road_network_",
+            mode="w", encoding="utf-8"
+        )
+        tmp.write(json_str)
+        tmp.close()
+
+        ai_note = f"AI ラベル {len(label_map)}/{len(paths)} 件" if label_map else "自動命名"
+        n_pts = sum(len(p) for p in paths)
+        status = (
+            f"Step 2 完了: {len(paths)} パス、{n_pts} ウェイポイント ({ai_note})\n"
+            f"画像: {img_w}x{img_h}px  |  ワールドスケール: {world_scale}m 幅"
+        )
+        return result_pil, status, json_str, gr.update(value=tmp.name, visible=True)
+    except requests.exceptions.ConnectionError:
+        return None, f"Ollama に接続できません ({ollama_url})。起動確認: ollama serve", "", gr.update(visible=False)
+    except requests.exceptions.Timeout:
+        return None, "Ollama がタイムアウト。AI送信画像サイズを小さくして再試行してください。", "", gr.update(visible=False)
+    except requests.exceptions.HTTPError as e:
+        return None, f"Ollama API エラー: {e}\nモデル名 '{model_name}' を確認: ollama list", "", gr.update(visible=False)
+    except Exception as e:
+        return None, f"パス生成エラー: {type(e).__name__}: {e}", "", gr.update(visible=False)
+
+
 # ── Gradio UI ─────────────────────────────────────────────────────────────────
 
 def build_ui() -> gr.Blocks:
+    settings = load_settings()
+
+    def sv(key: str, default):
+        return settings.get(key, default)
+
+    mask_mode_options = ["lab（従来）", "veg-suppressed（芝生除去）"]
+    mask_mode_default = sv("mask_mode", "veg-suppressed（芝生除去）")
+    if mask_mode_default not in mask_mode_options:
+        mask_mode_default = "veg-suppressed（芝生除去）"
+
     with gr.Blocks(title="Road Path Extractor") as demo:
         gr.Markdown(
             "# Road Path Extractor\n"
@@ -623,63 +914,106 @@ def build_ui() -> gr.Blocks:
             with gr.Column(scale=1):
                 image_input = gr.Image(type="pil", label="衛星・航空写真", height=360)
 
-                with gr.Accordion("Ollama / 出力設定", open=False):
-                    ollama_url    = gr.Textbox(value=DEFAULT_OLLAMA_URL, label="Ollama URL")
-                    model_name    = gr.Textbox(value=DEFAULT_MODEL,      label="モデル名")
-                    world_scale   = gr.Slider(100, 10000, DEFAULT_WORLD_SCALE, step=50,
-                                              label="ワールドスケール（画像幅 [m]）")
-                    center_origin = gr.Checkbox(value=True, label="ワールド原点を画像中央に配置")
-                    default_speed = gr.Slider(20, 200, DEFAULT_SPEED, step=5,
-                                              label="デフォルト速度 [km/h]")
-                    default_width = gr.Slider(1.0, 10.0, DEFAULT_WIDTH, step=0.5,
-                                              label="デフォルト車線幅 [m]")
-                    road_type     = gr.Number(value=0, label="道路タイプ (roadType)", precision=0)
-                    max_img_size  = gr.Slider(512, 2048, DEFAULT_MAX_IMG_SIZE, step=128,
-                                              label="AI 送信時の最大画像サイズ [px]")
+                mask_state = gr.State(value=None)
 
-                with gr.Accordion("道路マスク（CV）パラメータ", open=True):
+                with gr.Row():
+                    mask_btn = gr.Button("Step 1: マスク生成", variant="primary", scale=2)
+                    path_btn = gr.Button("Step 2: パス生成", variant="primary", scale=2)
+                    clear_btn = gr.Button("クリア", variant="secondary", scale=1)
+
+                with gr.Accordion("Step 1: マスク生成パラメータ", open=True):
+                    with gr.Row():
+                        mask_mode = gr.Radio(
+                            mask_mode_options,
+                            value=mask_mode_default,
+                            label="マスク方式",
+                            info="veg-suppressed: ExG + HSV で植生を除去してからLAB抽出",
+                        )
                     gr.Markdown("##### 検出色の調整（LAB色空間）")
                     with gr.Row():
-                        l_min = gr.Slider(0, 120, DEFAULT_L_MIN, step=5,
+                        l_min = gr.Slider(0, 120, sv("l_min", DEFAULT_L_MIN), step=5,
                                           label="輝度下限 L_min",
                                           info="暗い影を除外")
-                        l_max = gr.Slider(100, 255, DEFAULT_L_MAX, step=5,
+                        l_max = gr.Slider(100, 255, sv("l_max", DEFAULT_L_MAX), step=5,
                                           label="輝度上限 L_max",
                                           info="白線・明るい部分を除外")
                     with gr.Row():
-                        chroma_max = gr.Slider(5, 80, DEFAULT_CHROMA_MAX, step=2,
+                        chroma_max = gr.Slider(5, 80, sv("chroma_max", DEFAULT_CHROMA_MAX), step=2,
                                                label="最大彩度 Chroma",
                                                info="小さい=純グレーのみ検出")
-                        close_size = gr.Slider(5, 60, DEFAULT_CLOSE_SIZE, step=2,
+                        close_size = gr.Slider(5, 60, sv("close_size", DEFAULT_CLOSE_SIZE), step=2,
                                                label="Close カーネル [px]",
                                                info="道路の隙間を埋める")
                     with gr.Row():
-                        min_area   = gr.Slider(500, 20000, DEFAULT_MIN_AREA, step=500,
+                        min_area   = gr.Slider(500, 20000, sv("min_area", DEFAULT_MIN_AREA), step=500,
                                                label="最小面積 [px²]",
                                                info="小さなノイズを除去")
-                        min_pixels = gr.Slider(20, 400, DEFAULT_MIN_PIXELS, step=10,
-                                               label="最小パス長 [px]",
-                                               info="短いパスを除外")
-
-                    gr.Markdown("##### パス生成の調整")
+                    gr.Markdown("##### 植生除去の調整（veg-suppressed用）")
                     with gr.Row():
-                        simplify_eps  = gr.Slider(0.5, 10.0, DEFAULT_SIMPLIFY_EPS, step=0.5,
+                        exg_thresh = gr.Slider(
+                            -20, 80, sv("exg_thresh", DEFAULT_EXG_THRESH), step=1,
+                            label="ExG しきい値",
+                            info="小さいほど芝生を強く除去（小さすぎると道路も欠ける）",
+                        )
+                        green_s_min = gr.Slider(
+                            0, 200, sv("green_s_min", DEFAULT_GREEN_S_MIN), step=5,
+                            label="緑判定 最小彩度 S_min",
+                            info="大きいほど彩度の高い緑だけを植生として除外",
+                        )
+                    with gr.Row():
+                        green_h_min = gr.Slider(
+                            0, 90, sv("green_h_min", DEFAULT_GREEN_H_MIN), step=1,
+                            label="緑判定 Hue下限",
+                        )
+                        green_h_max = gr.Slider(
+                            60, 140, sv("green_h_max", DEFAULT_GREEN_H_MAX), step=1,
+                            label="緑判定 Hue上限",
+                        )
+                    gr.Markdown("##### 道路救済の調整（veg-suppressed用）")
+                    with gr.Row():
+                        rescue_s_max = gr.Slider(
+                            20, 140, sv("rescue_s_max", DEFAULT_RESCUE_S_MAX), step=2,
+                            label="救済 最大彩度 S_max",
+                            info="大きいほど芝生誤検出も増えるが、道路の取りこぼしを減らせる",
+                        )
+                        rescue_v_min = gr.Slider(
+                            40, 200, sv("rescue_v_min", DEFAULT_RESCUE_V_MIN), step=2,
+                            label="救済 最小明度 V_min",
+                            info="小さいほど暗い道路も救済（小さすぎるとノイズ増）",
+                        )
+
+                with gr.Accordion("Step 2: パス生成 / AIラベル / 出力設定", open=False):
+                    gr.Markdown("##### パス生成の調整")
+                    min_pixels = gr.Slider(20, 400, sv("min_pixels", DEFAULT_MIN_PIXELS), step=10,
+                                           label="最小パス長 [px]",
+                                           info="短いパスを除外")
+                    with gr.Row():
+                        simplify_eps  = gr.Slider(0.5, 10.0, sv("simplify_eps", DEFAULT_SIMPLIFY_EPS), step=0.5,
                                                   label="簡略化 ε [px]",
                                                   info="小さい=ウェイポイントが多い・精細")
-                        smooth_window = gr.Slider(3, 21, DEFAULT_SMOOTH_WIN, step=2,
+                        smooth_window = gr.Slider(3, 21, sv("smooth_window", DEFAULT_SMOOTH_WIN), step=2,
                                                   label="平滑化ウィンドウ [px]",
                                                   info="大きい=ジャギーが減る・なめらか")
                     with gr.Row():
-                        merge_gap   = gr.Slider(0, 60, DEFAULT_MERGE_GAP, step=5,
+                        merge_gap   = gr.Slider(0, 60, sv("merge_gap", DEFAULT_MERGE_GAP), step=5,
                                                 label="端点結合距離 [px]",
                                                 info="近い端点を自動接続する距離")
-                        merge_angle = gr.Slider(10, 90, DEFAULT_MERGE_ANGLE, step=5,
+                        merge_angle = gr.Slider(10, 90, sv("merge_angle", DEFAULT_MERGE_ANGLE), step=5,
                                                 label="端点結合角度 [°]",
                                                 info="大きい=方向が多少ズレても結合")
-
-                with gr.Row():
-                    extract_btn = gr.Button("道路を検出", variant="primary", scale=3)
-                    clear_btn   = gr.Button("クリア",    variant="secondary", scale=1)
+                    gr.Markdown("##### AIラベル / 出力")
+                    ollama_url = gr.Textbox(value=sv("ollama_url", DEFAULT_OLLAMA_URL), label="Ollama URL")
+                    model_name = gr.Textbox(value=sv("model_name", DEFAULT_MODEL), label="モデル名")
+                    world_scale = gr.Slider(100, 10000, sv("world_scale", DEFAULT_WORLD_SCALE), step=50,
+                                            label="ワールドスケール（画像幅 [m]）")
+                    center_origin = gr.Checkbox(value=sv("center_origin", True), label="ワールド原点を画像中央に配置")
+                    default_speed = gr.Slider(20, 200, sv("default_speed", DEFAULT_SPEED), step=5,
+                                              label="デフォルト速度 [km/h]")
+                    default_width = gr.Slider(1.0, 10.0, sv("default_width", DEFAULT_WIDTH), step=0.5,
+                                              label="デフォルト車線幅 [m]")
+                    road_type = gr.Number(value=sv("road_type", 0), label="道路タイプ (roadType)", precision=0)
+                    max_img_size = gr.Slider(512, 2048, sv("max_img_size", DEFAULT_MAX_IMG_SIZE), step=128,
+                                             label="AI 送信時の最大画像サイズ [px]")
 
             # ── 右カラム: 出力 ───────────────────────────────────────────────
             with gr.Column(scale=1):
@@ -691,21 +1025,33 @@ def build_ui() -> gr.Blocks:
                     label="road_network.json をダウンロード", visible=False
                 )
 
-        extract_btn.click(
-            fn=run_extraction,
+        mask_btn.click(
+            fn=run_mask_generation,
             inputs=[
-                image_input, ollama_url, model_name,
+                image_input,
+                mask_mode,
+                l_min, l_max, chroma_max, close_size, min_area,
+                exg_thresh, green_h_min, green_h_max, green_s_min,
+                rescue_s_max, rescue_v_min,
+            ],
+            outputs=[mask_output, status_box, result_output, json_output, download_btn, mask_state],
+        )
+
+        path_btn.click(
+            fn=run_path_generation,
+            inputs=[
+                image_input, mask_state,
+                ollama_url, model_name,
                 world_scale, center_origin,
                 default_speed, default_width, road_type, max_img_size,
-                l_min, l_max, chroma_max, close_size, min_area,
                 min_pixels, simplify_eps, smooth_window, merge_gap, merge_angle,
             ],
-            outputs=[mask_output, result_output, status_box, json_output, download_btn],
+            outputs=[result_output, status_box, json_output, download_btn],
         )
 
         clear_btn.click(
-            fn=lambda: (None, None, None, "", "", gr.update(visible=False)),
-            outputs=[image_input, mask_output, result_output, status_box, json_output, download_btn],
+            fn=lambda: (None, None, None, "", "", gr.update(visible=False), None),
+            outputs=[image_input, mask_output, result_output, status_box, json_output, download_btn, mask_state],
         )
 
     return demo

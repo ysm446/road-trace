@@ -2,7 +2,7 @@
 title Road Trace
 
 echo ========================================
-echo   Stock Trace
+echo   Road Trace
 echo ========================================
 
 set PYTHONIOENCODING=utf-8
