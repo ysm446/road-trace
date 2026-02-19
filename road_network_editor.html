@@ -198,6 +198,27 @@
     <div class="panel right">
       <div class="sec-title">Roads (<span id="roadCount">0</span>)</div>
       <div id="roadList"></div>
+      <div class="sec-title">Background</div>
+      <div class="row">
+        <button class="btn" id="btnBgLoad" style="background:#1a3a5a;color:#cde">Load Image</button>
+        <button class="btn danger" id="btnBgClear">Clear Image</button>
+      </div>
+      <div class="row">
+        <label>Scale (world / pixel)</label>
+        <input type="number" id="bgScale" min="0.001" step="0.001" value="1">
+      </div>
+      <div class="row">
+        <label>Offset X (world)</label>
+        <input type="number" id="bgOffsetX" step="1" value="0">
+      </div>
+      <div class="row">
+        <label>Offset Z (world)</label>
+        <input type="number" id="bgOffsetZ" step="1" value="0">
+      </div>
+      <div class="row">
+        <label>Opacity</label>
+        <input type="range" id="bgOpacity" min="0" max="1" step="0.05" value="0.65">
+      </div>
     </div>
   </div>
 
@@ -232,6 +253,7 @@
     </div>
   </div>
   <input type="file" id="fileImport" accept=".json" style="display:none">
+  <input type="file" id="bgImageImport" accept="image/*" style="display:none">
 
 <script>
 // =============================================================================
@@ -357,6 +379,14 @@ const fileState = {
   handle: null,
   name: '(unsaved)',
 };
+const bgState = {
+  image: null,
+  objectUrl: null,
+  scale: 1,
+  offsetX: 0,
+  offsetZ: 0,
+  opacity: 0.65,
+};
 
 function updateCurrentFileLabel() {
   const el = document.getElementById('currentFile');
@@ -371,6 +401,17 @@ function setCurrentFile(handle, name) {
   updateCurrentFileLabel();
 }
 
+function updateBgControlValues() {
+  const s=document.getElementById('bgScale');
+  const ox=document.getElementById('bgOffsetX');
+  const oz=document.getElementById('bgOffsetZ');
+  const op=document.getElementById('bgOpacity');
+  if(s) s.value=String(bgState.scale);
+  if(ox) ox.value=String(bgState.offsetX);
+  if(oz) oz.value=String(bgState.offsetZ);
+  if(op) op.value=String(bgState.opacity);
+}
+
 function pushUndo() {
   undoStack.push(JSON.stringify({ intersections: appData.intersections, roads: appData.roads }));
   if(undoStack.length > MAX_UNDO) undoStack.shift();
@@ -383,6 +424,10 @@ function undo() {
   appData.roads         = snap.roads;
   if(edState.selIntersectionId && !appData.intersections.find(p=>p.id===edState.selIntersectionId)) edState.selIntersectionId=null;
   if(edState.selRoadId          && !appData.roads.find(r=>r.id===edState.selRoadId))                 edState.selRoadId=null;
+  edState.selRoadIds=edState.selRoadIds.filter(id=>appData.roads.some(r=>r.id===id));
+  if(edState.selRoadId && !edState.selRoadIds.includes(edState.selRoadId)) {
+    edState.selRoadId=edState.selRoadIds[0]||null;
+  }
   edState.selWaypointId=null;
   refresh();
 }
@@ -488,6 +533,7 @@ class Renderer {
     const { ctx } = this;
     const W=this.cv.width, H=this.cv.height;
     ctx.clearRect(0,0,W,H);
+    this._drawBackgroundImage();
 
     // --- Grid ---
     const minorWorldUnit = 100;
@@ -585,14 +631,15 @@ class Renderer {
       ctx.textAlign='left';
     }
 
-    const { selRoadId, selIntersectionId, selWaypointId, pendingFromId,
+    const { selRoadId, selRoadIds, selIntersectionId, selWaypointId, pendingFromId,
             mouseWorld, mode, hoverRoadId, hoverIntersectionId, hoverWaypointId,
             selIntersectionIds, rectSelecting, rectStart, rectCurrent, dragRoadId } = state;
 
     // Roads — unselected first, selected on top
     for(let pass=0; pass<2; pass++) {
       for(const road of appData.roads) {
-        const isSel   = road.id === selRoadId;
+        const isSel   = selRoadIds.includes(road.id);
+        const isActiveSel = road.id === selRoadId;
         const isHover = road.id === hoverRoadId;
         const isDraggingBody = road.id === dragRoadId;
         if(pass===0 && isSel)  continue;
@@ -612,7 +659,7 @@ class Renderer {
         if(mid) this._drawArrow(mid.p, mid.dir, isSel ? '#ffffff' : '#4466aa', isSel ? 9 : 7);
 
         // Waypoints — only for selected road
-        if(isSel) {
+        if(isActiveSel) {
           // Guide skeleton: dashed polyline connecting all control points
           if(pts.length >= 2) {
             ctx.strokeStyle='#334455'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
@@ -744,6 +791,28 @@ class Renderer {
     ctx.globalAlpha=1; ctx.restore();
   }
 
+  _drawBackgroundImage() {
+    const img=bgState.image;
+    if(!img || !img.complete) return;
+    const wWorld=img.width*bgState.scale;
+    const hWorld=img.height*bgState.scale;
+    if(wWorld<=0 || hWorld<=0) return;
+    const x0=bgState.offsetX-wWorld*0.5;
+    const z0=bgState.offsetZ-hWorld*0.5;
+    const x1=x0+wWorld;
+    const z1=z0+hWorld;
+    const s0=this.w2s({x:x0,z:z0});
+    const s1=this.w2s({x:x1,z:z1});
+    const drawW=s1.x-s0.x;
+    const drawH=s1.y-s0.y;
+    if(Math.abs(drawW)<1 || Math.abs(drawH)<1) return;
+    const ctx=this.ctx;
+    ctx.save();
+    ctx.globalAlpha=Math.max(0,Math.min(1,bgState.opacity));
+    ctx.drawImage(img, s0.x, s0.y, drawW, drawH);
+    ctx.restore();
+  }
+
   // --- Hit tests ---
   hitTestIntersection(sx, sy, threshold=14) {
     let best=null, bd=threshold;
@@ -805,6 +874,7 @@ const edState = {
   mode: 'select',
   selIntersectionId:  null,
   selRoadId:          null,
+  selRoadIds:         [],
   selWaypointId:      null,
   pendingFromId:      null,
   hoverIntersectionId:null,
@@ -841,6 +911,67 @@ function resize() {
 }
 function doRender() { ren.render(edState); }
 function refresh()  { doRender(); updateRoadList(); updatePropsPanel(); }
+
+function clearRoadSelection() {
+  edState.selRoadId=null;
+  edState.selRoadIds=[];
+  edState.selWaypointId=null;
+}
+
+function setSingleRoadSelection(id) {
+  edState.selRoadId=id||null;
+  edState.selRoadIds=id?[id]:[];
+  edState.selWaypointId=null;
+}
+
+function toggleRoadSelection(id) {
+  const idx=edState.selRoadIds.indexOf(id);
+  if(idx>=0) {
+    edState.selRoadIds.splice(idx,1);
+    if(edState.selRoadId===id) edState.selRoadId=edState.selRoadIds[edState.selRoadIds.length-1]||null;
+  } else {
+    edState.selRoadIds.push(id);
+    edState.selRoadId=id;
+  }
+  edState.selWaypointId=null;
+}
+
+function selectedRoads() {
+  return edState.selRoadIds
+    .map(id=>appData.roads.find(r=>r.id===id))
+    .filter(Boolean);
+}
+
+function orientedRoadPoints(road, startId, endId) {
+  const pts=roadPoints(road);
+  if(pts.length<2) return [];
+  if(road.fromId===startId && road.toId===endId) return pts;
+  if(road.fromId===endId && road.toId===startId) return pts.slice().reverse();
+  return [];
+}
+
+function getRoadMergeCandidate(roads=null) {
+  const rs=roads||selectedRoads();
+  if(rs.length!==2) return null;
+  const [a,b]=rs;
+  const shared=[a.fromId,a.toId].filter((id,idx,arr)=>arr.indexOf(id)===idx && (b.fromId===id||b.toId===id));
+  if(shared.length!==1) return null;
+  const sharedId=shared[0];
+  const aOther=a.fromId===sharedId ? a.toId : a.fromId;
+  const bOther=b.fromId===sharedId ? b.toId : b.fromId;
+  if(aOther===bOther) return null;
+
+  const connected=appData.roads.filter(r=>r.fromId===sharedId||r.toId===sharedId);
+  if(connected.length!==2) return null;
+  const selIds=new Set([a.id,b.id]);
+  if(!connected.every(r=>selIds.has(r.id))) return null;
+
+  if(!appData.intersections.find(p=>p.id===sharedId)) return null;
+  if(!appData.intersections.find(p=>p.id===aOther)) return null;
+  if(!appData.intersections.find(p=>p.id===bOther)) return null;
+
+  return { roadA:a, roadB:b, sharedId, aOther, bOther };
+}
 
 // =============================================================================
 // Mouse events
@@ -887,26 +1018,30 @@ cv.addEventListener('mousedown', e => {
           cv.style.cursor='grabbing'; break;
         }
         edState.selIntersectionIds=[];
-        edState.selIntersectionId=hitIt; edState.selRoadId=null; edState.selWaypointId=null;
+        edState.selIntersectionId=hitIt; clearRoadSelection();
         edState.dragIntersectionId=hitIt; cv.style.cursor='grabbing'; break;
       }
       // 3. Road
       const hitRoad=ren.hitTestRoad(p.x,p.y);
       if(hitRoad) {
-        if(hitRoad===edState.selRoadId) {
+        edState.selIntersectionIds=[];
+        edState.selIntersectionId=null;
+        if(e.shiftKey) {
+          toggleRoadSelection(hitRoad);
+          edState.dragRoadId=null; edState.dragRoadClickWorld=null; edState.dragGroupStart=null;
+        } else if(edState.selRoadIds.length===1 && edState.selRoadIds[0]===hitRoad) {
           // Already selected: prepare for either road-body drag or waypoint insertion (decided in mouseup/mousemove)
           edState.dragRoadId=hitRoad;
           edState.dragGroupStart={x:p.x,y:p.y};
           edState.dragRoadClickWorld={x:w.x,z:w.z};
           cv.style.cursor='grab';
         } else {
-          edState.selIntersectionIds=[];
-          edState.selRoadId=hitRoad; edState.selIntersectionId=null; edState.selWaypointId=null;
+          setSingleRoadSelection(hitRoad);
         }
         break;
       }
       // 4. Empty → deselect + start rectangle selection
-      edState.selIntersectionId=null; edState.selIntersectionIds=[]; edState.selRoadId=null; edState.selWaypointId=null;
+      edState.selIntersectionId=null; edState.selIntersectionIds=[]; clearRoadSelection();
       edState.rectSelecting=true; edState.rectStart={x:p.x,y:p.y}; edState.rectCurrent={x:p.x,y:p.y};
       cv.style.cursor='crosshair';
       break;
@@ -925,7 +1060,7 @@ cv.addEventListener('mousedown', e => {
           document.getElementById('statusMsg').textContent='2番目の交差点をクリックしてください。';
         } else if(hitIt!==edState.pendingFromId) {
           const road=addRoad(edState.pendingFromId, hitIt);
-          if(road) { edState.selRoadId=road.id; edState.selIntersectionId=null; }
+          if(road) { setSingleRoadSelection(road.id); edState.selIntersectionId=null; }
           else document.getElementById('statusMsg').textContent='この2点間には既に道があります。';
           edState.pendingFromId=null;
         } else {
@@ -956,13 +1091,15 @@ cv.addEventListener('mousedown', e => {
       if(hitIt) {
         deleteIntersection(hitIt);
         if(edState.selIntersectionId===hitIt) edState.selIntersectionId=null;
-        if(edState.selRoadId && !appData.roads.find(r=>r.id===edState.selRoadId)) edState.selRoadId=null;
+        edState.selRoadIds=edState.selRoadIds.filter(id=>appData.roads.some(r=>r.id===id));
+        if(edState.selRoadId && !edState.selRoadIds.includes(edState.selRoadId)) edState.selRoadId=edState.selRoadIds[0]||null;
         break;
       }
       const hitRoad=ren.hitTestRoad(p.x,p.y,10);
       if(hitRoad) {
         deleteRoad(hitRoad);
-        if(edState.selRoadId===hitRoad){ edState.selRoadId=null; edState.selWaypointId=null; }
+        edState.selRoadIds=edState.selRoadIds.filter(id=>id!==hitRoad);
+        if(edState.selRoadId===hitRoad){ edState.selRoadId=edState.selRoadIds[0]||null; edState.selWaypointId=null; }
         break;
       }
       edState.panning=true; edState.panStart=p; edState.panBase={x:ren.ox,y:ren.oy};
@@ -1144,7 +1281,7 @@ window.addEventListener('keydown', e=>{
     case 'd': setMode('delete'); break;
     case 'escape':
       edState.pendingFromId=null;
-      edState.selIntersectionId=null; edState.selIntersectionIds=[]; edState.selRoadId=null; edState.selWaypointId=null;
+      edState.selIntersectionId=null; edState.selIntersectionIds=[]; clearRoadSelection();
       edState.rectSelecting=false; edState.rectStart=null; edState.rectCurrent=null;
       refresh(); break;
     case 'delete': case 'backspace':
@@ -1157,12 +1294,12 @@ window.addEventListener('keydown', e=>{
         for(const id of ids) {
           deleteIntersectionCore(id);
         }
-        edState.selIntersectionIds=[]; edState.selIntersectionId=null; edState.selRoadId=null; edState.selWaypointId=null;
+        edState.selIntersectionIds=[]; edState.selIntersectionId=null; clearRoadSelection();
         refresh();
       } else if(edState.selIntersectionId) {
         deleteIntersection(edState.selIntersectionId); edState.selIntersectionId=null; refresh();
-      } else if(edState.selRoadId) {
-        deleteRoad(edState.selRoadId); edState.selRoadId=null; edState.selWaypointId=null; refresh();
+      } else if(edState.selRoadIds.length>0 || edState.selRoadId) {
+        deleteSelectedRoad();
       }
       break;
     case 'z':
@@ -1213,7 +1350,45 @@ function updatePropsPanel() {
     return;
   }
 
-  if(edState.selRoadId) {
+  if(edState.selRoadIds.length>1) {
+    const roads=selectedRoads();
+    if(!roads.length){ panel.innerHTML='<div class="no-sel">Nothing selected</div>'; return; }
+    const first=roads[0];
+    const mergeCand=roads.length===2 ? getRoadMergeCandidate(roads) : null;
+    const presetBtns=PRESETS.map(p=>
+      `<button class="preset-btn" onclick="applyPresetSelected('${p.key}')">${p.label}</button>`
+    ).join('');
+    panel.innerHTML=`
+      <div class="sec-title">${roads.length} Roads Selected</div>
+      <div class="row"><label>Target Speed <span class="range-val" id="pSpdVal">${first.targetSpeed}</span> km/h</label>
+        <input type="range" id="pSpd" min="20" max="200" value="${first.targetSpeed}" step="5"></div>
+      <div class="row"><label>Width Left (m)</label>
+        <input type="number" id="pWidthL" value="${first.widthLeft}" min="0" max="20" step="0.5"></div>
+      <div class="row"><label>Width Right (m)</label>
+        <input type="number" id="pWidthR" value="${first.widthRight}" min="0" max="20" step="0.5"></div>
+      <div class="row"><label>Friction</label>
+        <input type="number" id="pFriction" value="${first.friction}" min="0" max="1" step="0.01"></div>
+      <div class="row"><label>Road Type</label>
+        <input type="number" id="pRoadType" value="${first.roadType}" min="0" max="99" step="1"></div>
+      <div class="sec-title">Shape Presets</div>
+      <div class="preset-grid">${presetBtns}</div>
+      ${mergeCand ? '<button class="btn" style="background:#2a5a4a;color:#cfc" onclick="mergeSelectedRoadsAtIntersection()">&#x21C4; Merge Two Roads</button>' : ''}
+      <button class="btn danger" onclick="clearWaypointsSelected()">&#10005; Clear Waypoints (Selected)</button>
+      <button class="btn danger" style="margin-top:4px" onclick="deleteSelectedRoad()">&#10005; Delete Selected Roads</button>
+    `;
+    document.getElementById('pSpd').addEventListener('input', e=>{
+      for(const road of roads) road.targetSpeed=+e.target.value;
+      document.getElementById('pSpdVal').textContent=e.target.value;
+      updateRoadList();
+    });
+    document.getElementById('pWidthL').addEventListener('change', e=>{ for(const road of roads) road.widthLeft =+e.target.value; });
+    document.getElementById('pWidthR').addEventListener('change', e=>{ for(const road of roads) road.widthRight=+e.target.value; });
+    document.getElementById('pFriction').addEventListener('change', e=>{ for(const road of roads) road.friction  =+e.target.value; });
+    document.getElementById('pRoadType').addEventListener('change', e=>{ for(const road of roads) road.roadType  =+e.target.value; });
+    return;
+  }
+
+  if(edState.selRoadId && edState.selRoadIds.length===1) {
     const road=appData.roads.find(r=>r.id===edState.selRoadId);
     if(!road){ panel.innerHTML='<div class="no-sel">Nothing selected</div>'; return; }
 
@@ -1298,7 +1473,7 @@ function splitRoadAtWaypoint(roadId, waypointId) {
   appData.roads=appData.roads.filter(r=>r.id!==roadId);
 
   // Select new intersection
-  edState.selRoadId=null; edState.selWaypointId=null;
+  clearRoadSelection();
   edState.selIntersectionId=newIt.id;
   refresh();
 }
@@ -1321,14 +1496,79 @@ function clearWaypoints(roadId) {
   pushUndo(); road.waypoints=[]; edState.selWaypointId=null; refresh();
 }
 
+function applyPresetSelected(preset) {
+  const roads=selectedRoads();
+  if(!roads.length) return;
+  pushUndo();
+  for(const road of roads) {
+    const from=appData.intersections.find(p=>p.id===road.fromId);
+    const to  =appData.intersections.find(p=>p.id===road.toId);
+    if(!from||!to) continue;
+    road.waypoints=presetWaypoints(from,to,preset).map(p=>({id:hex8(),x:p.x,z:p.z}));
+  }
+  edState.selWaypointId=null;
+  refresh();
+}
+
+function clearWaypointsSelected() {
+  const roads=selectedRoads();
+  if(!roads.length) return;
+  pushUndo();
+  for(const road of roads) road.waypoints=[];
+  edState.selWaypointId=null;
+  refresh();
+}
+
+function mergeSelectedRoadsAtIntersection() {
+  const cand=getRoadMergeCandidate();
+  if(!cand) return;
+  const { roadA, roadB, sharedId, aOther, bOther }=cand;
+
+  const ptsA=orientedRoadPoints(roadA, aOther, sharedId);
+  const ptsB=orientedRoadPoints(roadB, sharedId, bOther);
+  if(ptsA.length<2 || ptsB.length<2) return;
+
+  const mergedPts=[...ptsA, ...ptsB.slice(1)];
+  const waypoints=mergedPts.slice(1, mergedPts.length-1).map(p=>({id:hex8(), x:p.x, z:p.z}));
+
+  pushUndo();
+
+  const mergedRoad={
+    id:hex8(),
+    fromId:aOther,
+    toId:bOther,
+    name:`${roadA.name}+${roadB.name}`,
+    targetSpeed:roadA.targetSpeed,
+    widthLeft:roadA.widthLeft,
+    widthRight:roadA.widthRight,
+    friction:roadA.friction,
+    roadType:roadA.roadType,
+    waypoints,
+  };
+
+  const delIds=new Set([roadA.id, roadB.id]);
+  appData.roads=appData.roads.filter(r=>!delIds.has(r.id));
+  appData.roads.push(mergedRoad);
+  appData.intersections=appData.intersections.filter(p=>p.id!==sharedId);
+
+  edState.selIntersectionId=null;
+  edState.selIntersectionIds=[];
+  setSingleRoadSelection(mergedRoad.id);
+  refresh();
+}
+
 function deleteSelectedIntersection() {
   if(!edState.selIntersectionId) return;
   deleteIntersection(edState.selIntersectionId); edState.selIntersectionId=null; refresh();
 }
 
 function deleteSelectedRoad() {
-  if(!edState.selRoadId) return;
-  deleteRoad(edState.selRoadId); edState.selRoadId=null; edState.selWaypointId=null; refresh();
+  const ids=edState.selRoadIds.length?[...edState.selRoadIds]:(edState.selRoadId?[edState.selRoadId]:[]);
+  if(!ids.length) return;
+  pushUndo();
+  appData.roads=appData.roads.filter(r=>!ids.includes(r.id));
+  clearRoadSelection();
+  refresh();
 }
 
 function mergeSelectedIntersections() {
@@ -1356,8 +1596,7 @@ function mergeSelectedIntersections() {
 
   edState.selIntersectionIds=[];
   edState.selIntersectionId=merged.id;
-  edState.selRoadId=null;
-  edState.selWaypointId=null;
+  clearRoadSelection();
   refresh();
 }
 
@@ -1367,17 +1606,24 @@ function mergeSelectedIntersections() {
 function updateRoadList() {
   document.getElementById('roadCount').textContent=appData.roads.length;
   document.getElementById('roadList').innerHTML=appData.roads.map(road=>{
-    const isSel=road.id===edState.selRoadId;
-    return `<div class="road-item${isSel?' sel':''}" onclick="selectRoad('${road.id}')">
+    const isSel=edState.selRoadIds.includes(road.id);
+    return `<div class="road-item${isSel?' sel':''}" onclick="selectRoad(event,'${road.id}')">
       <div class="road-name">${road.name}</div>
       <div class="road-meta">${road.targetSpeed} km/h &middot; WP:${road.waypoints.length}</div>
     </div>`;
   }).join('');
 }
 
-function selectRoad(id) {
-  edState.selRoadId=edState.selRoadId===id?null:id;
-  edState.selIntersectionId=null; edState.selWaypointId=null;
+function selectRoad(evt, id) {
+  edState.selIntersectionId=null;
+  edState.selIntersectionIds=[];
+  if(evt && evt.shiftKey) {
+    toggleRoadSelection(id);
+  } else if(edState.selRoadIds.length===1 && edState.selRoadIds[0]===id) {
+    clearRoadSelection();
+  } else {
+    setSingleRoadSelection(id);
+  }
   refresh();
 }
 
@@ -1530,6 +1776,63 @@ document.getElementById('fileImport').addEventListener('change', function(e){
   fr.readAsText(file); this.value='';
 });
 
+function clearBackgroundImage() {
+  bgState.image=null;
+  if(bgState.objectUrl) {
+    URL.revokeObjectURL(bgState.objectUrl);
+    bgState.objectUrl=null;
+  }
+}
+
+function applyBackgroundControlValues() {
+  const scaleVal=parseFloat(document.getElementById('bgScale').value);
+  const oxVal=parseFloat(document.getElementById('bgOffsetX').value);
+  const ozVal=parseFloat(document.getElementById('bgOffsetZ').value);
+  const opVal=parseFloat(document.getElementById('bgOpacity').value);
+  if(Number.isFinite(scaleVal) && scaleVal>0) bgState.scale=scaleVal;
+  if(Number.isFinite(oxVal)) bgState.offsetX=oxVal;
+  if(Number.isFinite(ozVal)) bgState.offsetZ=ozVal;
+  if(Number.isFinite(opVal)) bgState.opacity=Math.max(0,Math.min(1,opVal));
+  doRender();
+}
+
+document.getElementById('btnBgLoad').addEventListener('click', ()=> {
+  document.getElementById('bgImageImport').click();
+});
+
+document.getElementById('btnBgClear').addEventListener('click', ()=> {
+  clearBackgroundImage();
+  doRender();
+});
+
+document.getElementById('bgImageImport').addEventListener('change', function(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const center=ren.s2w({x:cv.width*0.5, y:cv.height*0.5});
+  const url=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    clearBackgroundImage();
+    bgState.image=img;
+    bgState.objectUrl=url;
+    bgState.offsetX=Math.round(center.x);
+    bgState.offsetZ=Math.round(center.z);
+    updateBgControlValues();
+    doRender();
+  };
+  img.onerror=()=>{
+    URL.revokeObjectURL(url);
+    alert('Failed to load image.');
+  };
+  img.src=url;
+  this.value='';
+});
+
+document.getElementById('bgScale').addEventListener('input', applyBackgroundControlValues);
+document.getElementById('bgOffsetX').addEventListener('input', applyBackgroundControlValues);
+document.getElementById('bgOffsetZ').addEventListener('input', applyBackgroundControlValues);
+document.getElementById('bgOpacity').addEventListener('input', applyBackgroundControlValues);
+
 function loadJSON(data) {
   if(!Array.isArray(data)||!data.length){ alert('Invalid JSON: expected non-empty array'); return false; }
   pushUndo();
@@ -1569,7 +1872,7 @@ function loadJSON(data) {
   }
 
   appData.intersections=newIntersections; appData.roads=newRoads;
-  edState.selIntersectionId=null; edState.selRoadId=null;
+  edState.selIntersectionId=null; clearRoadSelection();
   edState.selWaypointId=null; edState.pendingFromId=null;
   ren.fitView(); refresh();
   return true;
@@ -1650,7 +1953,7 @@ function generateCourse() {
   closeGenModal();
   pushUndo();
   appData.intersections=[]; appData.roads=[];
-  edState.selIntersectionId=null; edState.selRoadId=null;
+  edState.selIntersectionId=null; clearRoadSelection();
   edState.selWaypointId=null; edState.pendingFromId=null; edState.selIntersectionIds=[];
 
   const isClosed = cfg.closed===null ? Math.random()<0.5 : cfg.closed;
@@ -1787,7 +2090,7 @@ document.getElementById('btnClear') .addEventListener('click', ()=>{
   if(!confirm('全ての交差点と道を削除しますか？')) return;
   pushUndo();
   appData.intersections=[]; appData.roads=[];
-  edState.selIntersectionId=null; edState.selRoadId=null;
+  edState.selIntersectionId=null; clearRoadSelection();
   edState.selWaypointId=null; edState.pendingFromId=null;
   refresh();
 });
@@ -1807,6 +2110,7 @@ document.getElementById('genModal').addEventListener('click', function(e){
 // =============================================================================
 window.addEventListener('resize', resize);
 updateCurrentFileLabel();
+updateBgControlValues();
 resize(); doRender(); updatePropsPanel(); updateRoadList();
 </script>
 </body>
