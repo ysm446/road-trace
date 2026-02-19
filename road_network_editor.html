@@ -732,10 +732,9 @@ class Renderer {
   }
 
   // Evaluate piecewise-quadratic Bezier at t [0,1].
-  // Curve passes through midpoints between consecutive control points,
-  // and through pts[0] / pts[last] exactly.
-  // Segments: pts[0]→mid(pts[1],pts[2])→mid(pts[2],pts[3])→…→pts[last]
-  // Each segment is a quadratic Bezier with pts[k+1] as the control handle.
+  // Curve passes through split points on each interior edge.
+  // Split position is decided by neighboring-edge length ratio.
+  // Endpoints remain pts[0] / pts[last].
   _curveAt(pts, t) {
     const n = pts.length - 1;
     if(n <= 0) return v2(pts[0].x, pts[0].z);
@@ -744,14 +743,30 @@ class Renderer {
     const segT    = t * numSegs;
     const k       = Math.min(Math.floor(segT), numSegs-1);
     const lt      = segT - k;
-    const start   = k === 0       ? pts[0]                        : lerp(pts[k],   pts[k+1], 0.5);
+    const start   = k === 0       ? pts[0]                        : this._splitPointByNeighborEdgeRatio(pts, k);
     const ctrl    = pts[k+1];
-    const end     = k < numSegs-1 ? lerp(pts[k+1], pts[k+2], 0.5): pts[n];
+    const end     = k < numSegs-1 ? this._splitPointByNeighborEdgeRatio(pts, k+1) : pts[n];
     return lerp(lerp(start, ctrl, lt), lerp(ctrl, end, lt), lt);
   }
 
+  // Split point on edge pts[edgeIdx] -> pts[edgeIdx+1] using lengths of
+  // the neighboring edges (pts[edgeIdx-1]->pts[edgeIdx], pts[edgeIdx+1]->pts[edgeIdx+2]).
+  _splitPointByNeighborEdgeRatio(pts, edgeIdx) {
+    const a = pts[edgeIdx];
+    const b = pts[edgeIdx + 1];
+    const hasPrevNeighbor = edgeIdx - 1 >= 0;
+    const hasNextNeighbor = edgeIdx + 2 < pts.length;
+    if(!hasPrevNeighbor || !hasNextNeighbor) return lerp(a, b, 0.5);
+    const prevLen = dist(pts[edgeIdx - 1], a);
+    const nextLen = dist(b, pts[edgeIdx + 2]);
+    const sumLen  = prevLen + nextLen;
+    if(sumLen <= 1e-9) return lerp(a, b, 0.5);
+    const t = prevLen / sumLen;
+    return lerp(a, b, t);
+  }
+
   // Piecewise quadratic Bezier using Canvas 2D API (matches _curveAt exactly).
-  // Loop: each interior control point pts[k+1] guides a quadratic to the next midpoint.
+  // Loop: each interior control point pts[k+1] guides a quadratic to the next split point.
   // Final quadratic ends at pts[last].
   _drawCurve(pts) {
     const ctx = this.ctx;
@@ -764,9 +779,8 @@ class Renderer {
       ctx.lineTo(sp[1].x, sp[1].y);
     } else {
       for(let k=0; k<n-2; k++) {
-        const mx = (sp[k+1].x + sp[k+2].x) * 0.5;
-        const my = (sp[k+1].y + sp[k+2].y) * 0.5;
-        ctx.quadraticCurveTo(sp[k+1].x, sp[k+1].y, mx, my);
+        const mp = this.w2s(this._splitPointByNeighborEdgeRatio(pts, k+1));
+        ctx.quadraticCurveTo(sp[k+1].x, sp[k+1].y, mp.x, mp.y);
       }
       ctx.quadraticCurveTo(sp[n-1].x, sp[n-1].y, sp[n].x, sp[n].y);
     }
